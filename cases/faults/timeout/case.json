@@ -1,0 +1,8 @@
+{
+  "id": "timeout",
+  "input": "input.json",
+  "fixture": "fixture.json",
+  "acceptance": "acceptance.json",
+  "timeout_ms": 500,
+  "inject": "timeout"
+}

@@ -1,0 +1,5 @@
+node_modules/
+.pnpm-store/
+runs/
+_codex_out/
+*.tsbuildinfo

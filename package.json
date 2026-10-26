@@ -1,0 +1,14 @@
+{
+  "name": "agent-eval",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.0.0" },
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "eval": "node src/cli.ts",
+    "test": "node --test --test-concurrency=1 tests/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": { "@types/node": "20.17.19", "typescript": "5.7.3" }
+}

@@ -1,0 +1,8 @@
+{
+  "id": "verifier_error",
+  "input": "input.json",
+  "fixture": "fixture.json",
+  "acceptance": "acceptance.json",
+  "timeout_ms": 2000,
+  "inject": "verifier_error"
+}

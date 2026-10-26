@@ -1,0 +1,8 @@
+{
+  "id": "environment_error",
+  "input": "input.json",
+  "fixture": "fixture.json",
+  "acceptance": "acceptance.json",
+  "timeout_ms": 2000,
+  "inject": "environment_error"
+}

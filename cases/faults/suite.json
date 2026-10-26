@@ -1,0 +1,9 @@
+{
+  "cases": [
+    "agent_error",
+    "protocol_error",
+    "timeout",
+    "verifier_error",
+    "environment_error"
+  ]
+}
