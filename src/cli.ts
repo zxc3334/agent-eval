@@ -6,6 +6,7 @@ import { watch } from './watch.ts';
 import { generateReport } from './report.ts';
 import { identifier, readJson } from './config.ts';
 import { createCase } from './scaffold.ts';
+import { validateSchema } from './validation.ts';
 import type { Options } from './types.ts';
 
 try {
@@ -14,12 +15,25 @@ try {
     case: { type: 'string' }, 'cases-dir': { type: 'string' },
     experiment: { type: 'string' },
     requirement: { type: 'string' },
+    'schema-only': { type: 'boolean', default: false },
     'runs-dir': { type: 'string', default: 'runs' }, 'failed-from': { type: 'string' },
     'fail-fast': { type: 'boolean', default: false }, watch: { type: 'boolean', default: false },
     help: { type: 'boolean', default: false },
   } });
   if (values.help) {
-    console.log('Usage: pnpm eval [--suite smoke] [--agent stub] [--experiment <json>] [--case <id> | --failed-from <run-id>] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\n       pnpm eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=success/all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
+    console.log('Usage: pnpm eval [--suite smoke] [--agent stub] [--experiment <json>] [--case <id> | --failed-from <run-id>] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\n       pnpm eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --schema-only [--suite smoke] [--cases-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=success/all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
+  } else if (positionals[0] === 'validate') {
+    if (positionals.length !== 1 || !values['schema-only']) throw new Error('usage: eval validate --schema-only [--suite smoke] [--cases-dir <path>]');
+    for (const token of tokens) {
+      if (token.kind === 'option' && !['schema-only', 'suite', 'cases-dir'].includes(token.name)) throw new Error(`validate: unsupported option --${token.name}; use only --schema-only, --suite and --cases-dir`);
+    }
+    const suite = values.suite ?? 'smoke';
+    const result = validateSchema(resolve(values['cases-dir'] ?? 'cases'), suite);
+    for (const error of result.errors) console.error(`schema_error: ${error}`);
+    console.log(`Schema-only ${suite}: checked ${result.checked} case(s), ${result.errors.length} error(s).`);
+    process.exitCode = result.errors.length ? 2 : 0;
+  } else if (values['schema-only']) {
+    throw new Error('--schema-only is only supported by eval validate');
   } else if (positionals[0] === 'case') {
     if (positionals[1] !== 'new' || positionals.length !== 3 || !values.requirement) throw new Error('usage: eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]');
     for (const token of tokens) {

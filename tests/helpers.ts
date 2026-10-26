@@ -15,7 +15,7 @@ export function write(file: string, data: unknown) { writeFileSync(file, JSON.st
 export function writeSuite(cases: string, ids: string[]) {
   write(join(cases, 'smoke/suite.json'), { schema_version: 2, cases: ids.map(id => ({ id, version: '1.0.0' })) });
 }
-export function execute(args: string[]) { return spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', timeout: 15000 }); }
+export function execute(args: string[], cwd?: string) { return spawnSync(process.execPath, [cli, ...args], { cwd, encoding: 'utf8', timeout: 15000 }); }
 export function runDirs(runs: string): string[] { try { return readdirSync(runs).sort().map(id => join(runs, id)); } catch { return []; } }
 export function addCase(cases: string, id: string, inject?: string, delay = 0) {
   const dir = join(cases, 'smoke', id);
