@@ -1,6 +1,6 @@
-# agent-eval · 本地冒烟与 Case schema v2
+# agent-eval · 本地冒烟、Case schema v2 与脚手架
 
-独立 TypeScript 评测仓库。当前只测本地确定性 **stub**，不代表 jackson-bot 的能力；真实产品以后仅经 adapter 接入。已含 E0/E1/E2，本波仅增加 E3a schema v2，不接模型，不需要 API key、Docker 或 bot。
+独立 TypeScript 评测仓库。当前只测本地确定性 **stub**，不代表 jackson-bot 的能力；真实产品以后仅经 adapter 接入。已含 E0/E1/E2 与 E3a schema v2，本波增加 E3b brief 与 case 脚手架，不接模型，不需要 API key、Docker 或 bot。
 
 ## 安装与第一轮
 
@@ -27,7 +27,8 @@ smoke 有两个协议样例：`smoke-pass` 输出 `hello`，`smoke-fail` 输出 
 
 | 文件 | v2 内容 | 可见范围 |
 | --- | --- | --- |
-| `case.json` | `schema_version`、`id`、`version`、`type`（`positive`/`negative`）、文件引用、`artifact_allowlist`、`budgets`，可选 `inject` | harness 元数据，不整体传给 agent |
+| `case.json` | `schema_version`、`id`、`version`、`type`（`positive`/`negative`）、文件引用、`artifact_allowlist`、`budgets`，可选 `inject`、`requirement_id`、`brief` | harness 元数据，不整体传给 agent |
+| `brief.md` | 目标行为、退化信号、验收标准及需求来源；由 `case.json.brief` 引用 | 私有设计材料，不传给 agent |
 | `input.json` | `prompt` | 公开任务 |
 | `fixture.json` | 本地 fixture；当前 stub 使用 `answer`、可选 `delay_ms` | 公开环境材料 |
 | `initial-state.json` | `initial_state` 指向的 JSON 对象；无状态用 `{}` | 公开初始状态 |
@@ -108,6 +109,35 @@ pnpm eval report <run-id>
 
 `report` 成功生成返回 0，不复用原 run 的评测退出码。已有证据不变，仅重建 summary/report。
 
+## 添加 case（E3b）
+
+从仓库根目录运行：
+
+```sh
+pnpm eval case new greeting --requirement REQ-001
+# 可选：独立 suite 和 cases 根目录；不存在时自动创建
+pnpm eval case new greeting --requirement REQ-001 --suite local --cases-dir /tmp/my-eval-cases
+```
+
+默认写入 `cases/smoke/greeting/`，生成 `case.json`、`brief.md`、`input.json`、`fixture.json`、`initial-state.json`、`acceptance.json`。命令仅生成文件，不运行 adapter；成功退出 0，并打印路径与待办提示。自动创建或更新所在 suite 的 `suite.json`，追加 `{ "id": "greeting", "version": "1.0.0" }`，保留原有引用和其他清单字段。已有目录或清单中的同名 ID 会报错（exit 2），不会覆盖；已有无效 suite 也会报错，请先修复。
+
+`case.json.requirement_id` 是稳定的需求标识，与 brief 中的 `requirement_id` 一致；同一个需求可以关联多个 case。ID 使用字母数字开头，其余字符只允许字母数字、`_`、`-`，不能把 URL 或路径作为 ID；Notion 需求链接填写在 brief 正文中。旧 E3a case 无需补这些可选元数据，新脚手架始终生成 `requirement_id` 和 `brief` 引用。
+
+1. 填写 `brief.md`：目标行为描述前提、输入和可观察结果；退化信号描述什么变化算退化；验收标准列出通过条件及对应 criteria ID。补充需求来源链接。brief 仅供评测者，不能当作公开 prompt 传入。
+2. 编辑公开材料：在 `input.json.prompt` 写任务，在 `initial-state.json` 写初始状态；当前 stub 的 `fixture.json.answer` 只是模拟响应。公开材料不放私有 Gold、判分提示或错误对照。
+3. 独立编辑私有 `acceptance.json` 的 `gold.answer`、`criteria[].expected`、`error_examples`。默认 `type: "positive"`，可按需求改为 `negative`；两者都按 criteria 判分。人工确认后再将 `reviewed` 改为 true；未确认不阻止本地迭代。
+4. 单例运行并查看 CLI 输出的断言与证据路径：
+
+```sh
+pnpm eval --suite smoke --case greeting --agent stub
+# 自定义目录必须在运行时也传入
+pnpm eval --suite local --case greeting --cases-dir /tmp/my-eval-cases --agent stub
+```
+
+未经编辑的模板符合 v2，但 `TODO_STUB_RESPONSE` 与 `TODO_EXPECTED_ANSWER` 故意不同，所以初次运行预期 **FAIL、退出码 1**。这是脚手架连通性检查，不是实际需求验收。填写后的 brief 验收标准通过 criteria ID 对应 `result.json.assertions`，断言再指向 `artifacts/answer.json`；run 快照保留 `requirement_id`。brief 正文仍在 case 源目录，当前不做独立快照或自动解析。
+
+创建时使用 suite 内 `.case-new.lock` 防止多个脚手架写入者丢失引用，正常结束和报错都会释放。若进程被强制杀死，请确认没有创建进程在运行后，检查遗留 case 目录/清单，再手动删除锁并重试。未提供强制覆盖、自动需求拉取、自动 suite 升版或内容完整性审核；case 内容版本变化仍需同步修改 suite 中的精确版本。
+
 ## 改 case 并单例重跑
 
 ```sh
@@ -145,7 +175,7 @@ pnpm eval --help
 
 ## 本波边界
 
-本波只在已有本地协议链路上交付 E3a。借鉴 Harbor 的独立 verifier/产物分离与 Workbench 的需求→case→证据，不采用二者 runtime。不实现 E3b case new/brief、E3c validate --schema-only/完整防泄漏审计、E4+ 新 verifier、Gold/Oracle 校准、真实 adapter、baseline 对比、公共榜、云并行、线上 QQ 或默认 LLM judge。
+本波只在已有 E3a 本地协议链路上增加 E3b case new/brief。借鉴 Harbor 的独立 verifier/产物分离与 Workbench 的需求→case→证据，不采用二者 runtime。不实现 E3c validate --schema-only/完整防泄漏审计、E4+ 新 verifier、Gold/Oracle 校准、真实 adapter、baseline 对比、公共榜、云并行、线上 QQ 或默认 LLM judge。
 
 本机验收是 macOS arm64；Linux 使用相同 POSIX 机制但尚未实机验证，Windows 不支持本波进程组清理。不可捕获的 SIGKILL/断电不保证最后一份报告已写完；已写入的证据保留。stub 进程隔离用于生命周期管理，不是执行不可信代码的安全沙箱。
 
@@ -158,3 +188,4 @@ pnpm eval --help
 - E1：https://app.notion.com/405e1347ee97810c9934e82b2b8c5f35
 - E2：https://app.notion.com/405e1347ee978176b77cc486100195d8
 - E3a：https://app.notion.com/p/405e1347ee97813e9172d527cf9a96e9
+- E3b：https://app.notion.com/p/405e1347ee9781cda55ce3b07a09388f
