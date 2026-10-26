@@ -1,1 +1,19 @@
-{ "criteria": [{ "id": "answer-equals", "type": "equals", "expected": "hello" }] }
+{
+  "gold": {
+    "answer": "hello"
+  },
+  "criteria": [
+    {
+      "id": "answer-equals",
+      "type": "equals",
+      "expected": "hello"
+    }
+  ],
+  "error_examples": [
+    {
+      "answer": "wrong",
+      "reason": "Does not match the required greeting."
+    }
+  ],
+  "reviewed": false
+}

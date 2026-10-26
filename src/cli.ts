@@ -11,12 +11,13 @@ try {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     suite: { type: 'string' }, agent: { type: 'string', default: 'stub' },
     case: { type: 'string' }, 'cases-dir': { type: 'string' },
+    experiment: { type: 'string' },
     'runs-dir': { type: 'string', default: 'runs' }, 'failed-from': { type: 'string' },
     'fail-fast': { type: 'boolean', default: false }, watch: { type: 'boolean', default: false },
     help: { type: 'boolean', default: false },
   } });
   if (values.help) {
-    console.log('Usage: pnpm eval [--suite smoke] [--agent stub] [--case <id> | --failed-from <run-id>] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
+    console.log('Usage: pnpm eval [--suite smoke] [--agent stub] [--experiment <json>] [--case <id> | --failed-from <run-id>] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
   } else if (positionals[0] === 'report' && positionals.length === 2) {
     const dir = resolve(values['runs-dir']!, identifier(positionals[1], 'run-id'));
     generateReport(dir); console.log(`Report: ${dir}/report.md`);
@@ -40,6 +41,7 @@ try {
       suite: identifier(values.suite ?? source?.suite ?? 'smoke', 'suite'), agent: values.agent!,
       caseId: values.case ? identifier(values.case, 'case') : undefined,
       casesDir: resolve(values['cases-dir'] ?? source?.cases_dir ?? 'cases'), runsDir,
+      experimentFile: resolve(values.experiment ?? source?.experiment_file ?? 'experiments/stub.json'),
       watch: values.watch!, failFast: values['fail-fast']!, selectedIds, sourceRunId,
     };
     if (options.runsDir === options.casesDir || options.runsDir === join(options.casesDir, options.suite)

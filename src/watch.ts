@@ -20,6 +20,7 @@ function fingerprint(options: Options): string {
     } catch (e) { hash.update(String(e)); }
   };
   const suiteDir = join(options.casesDir, options.suite);
+  try { hash.update(readFileSync(options.experimentFile)); } catch (e) { hash.update(String(e)); }
   try { hash.update(readFileSync(join(suiteDir, 'suite.json'))); } catch (e) { hash.update(String(e)); }
   const selected = options.selectedIds ?? (options.caseId ? [options.caseId] : undefined);
   if (selected) selected.forEach(id => visit(join(suiteDir, id)));

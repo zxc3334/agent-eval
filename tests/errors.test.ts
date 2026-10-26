@@ -2,14 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join, basename } from 'node:path';
-import { setup, addCase, write, read, execute, runDirs, launch, until } from './helpers.ts';
+import { setup, writeSuite, addCase, write, read, execute, runDirs, launch, until } from './helpers.ts';
 
 test('faults have distinct statuses, mixed errors exit 2, reports regenerate offline', () => {
   const t = setup();
   try {
     const faults = ['agent_error', 'protocol_error', 'timeout', 'verifier_error', 'environment_error'];
     for (const fault of faults) addCase(t.cases, fault, fault);
-    write(join(t.cases, 'smoke/suite.json'), { cases: ['smoke-pass', 'smoke-fail', ...faults] });
+    writeSuite(t.cases, ['smoke-pass', 'smoke-fail', ...faults]);
     const result = execute(t.args);
     assert.equal(result.status, 2, result.stderr);
     const dir = runDirs(t.runs)[0];
@@ -36,7 +36,7 @@ test('faults have distinct statuses, mixed errors exit 2, reports regenerate off
 test('fail-fast stops after failed assertion while default continues', () => {
   const t = setup();
   try {
-    write(join(t.cases, 'smoke/suite.json'), { cases: ['smoke-fail', 'smoke-pass'] });
+    writeSuite(t.cases, ['smoke-fail', 'smoke-pass']);
     assert.equal(execute([...t.args, '--fail-fast']).status, 1);
     const s = read(join(runDirs(t.runs)[0], 'summary.json'));
     assert.equal(s.attempted, 1); assert.deepEqual(s.not_attempted, ['smoke-pass']);
@@ -45,8 +45,8 @@ test('fail-fast stops after failed assertion while default continues', () => {
 
 test('Ctrl-C preserves partial evidence, kills descendants and exits 2', async () => {
   const t = setup(); addCase(t.cases, 'interrupted', 'timeout');
-  const f = join(t.cases, 'smoke/interrupted/case.json'); write(f, { ...read(f), timeout_ms: 10000 });
-  write(join(t.cases, 'smoke/suite.json'), { cases: ['interrupted', 'smoke-pass'] });
+  const f = join(t.cases, 'smoke/interrupted/case.json'); write(f, { ...read(f), budgets: { ...read(f).budgets, timeout_ms: 10000 } });
+  writeSuite(t.cases, ['interrupted', 'smoke-pass']);
   const p = launch(t.args);
   try {
     await until(() => runDirs(t.runs).some(d => existsSync(join(d, 'cases/interrupted/workspace/descendant.json'))));
@@ -62,7 +62,7 @@ test('Ctrl-C preserves partial evidence, kills descendants and exits 2', async (
 
 test('case status is emitted before a later slow case finishes', async () => {
   const t = setup(); addCase(t.cases, 'slow', undefined, 1600);
-  write(join(t.cases, 'smoke/suite.json'), { cases: ['smoke-pass', 'slow'] });
+  writeSuite(t.cases, ['smoke-pass', 'slow']);
   const p = launch(t.args);
   try {
     await until(() => p.output().includes('PASS smoke-pass'));
