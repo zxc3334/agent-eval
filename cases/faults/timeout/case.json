@@ -1,8 +1,21 @@
 {
+  "schema_version": 2,
   "id": "timeout",
+  "version": "1.0.0",
+  "type": "negative",
   "input": "input.json",
   "fixture": "fixture.json",
+  "initial_state": "initial-state.json",
+  "artifact_allowlist": [
+    "answer.json",
+    "resource.json",
+    "descendant.json",
+    "partial.txt"
+  ],
+  "budgets": {
+    "timeout_ms": 500,
+    "max_steps": 1
+  },
   "acceptance": "acceptance.json",
-  "timeout_ms": 500,
   "inject": "timeout"
 }

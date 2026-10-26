@@ -1,10 +1,11 @@
-// Adapter protocol: read input/fixture, write { answer }. No acceptance or grading access.
+// One-step adapter protocol: read public AgentInput, write { answer }.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-const fixture = JSON.parse(readFileSync('fixture.json', 'utf8'));
+import type { AgentInput } from './types.ts';
+const input: AgentInput = JSON.parse(readFileSync('input.json', 'utf8'));
+const fixture = input.fixture;
 console.log('stub: reading local input and fixture');
-readFileSync('input.json', 'utf8');
 const mode = process.argv[2];
 writeFileSync('resource.json', JSON.stringify({ path: process.env.AGENT_EVAL_TEMP }));
 if (mode === 'timeout') {
