@@ -5,24 +5,35 @@ import { run } from './runner.ts';
 import { watch } from './watch.ts';
 import { generateReport } from './report.ts';
 import { identifier, readJson } from './config.ts';
+import { createCase } from './scaffold.ts';
 import type { Options } from './types.ts';
 
 try {
-  const { values, positionals } = parseArgs({ allowPositionals: true, options: {
+  const { values, positionals, tokens } = parseArgs({ allowPositionals: true, tokens: true, options: {
     suite: { type: 'string' }, agent: { type: 'string', default: 'stub' },
     case: { type: 'string' }, 'cases-dir': { type: 'string' },
     experiment: { type: 'string' },
+    requirement: { type: 'string' },
     'runs-dir': { type: 'string', default: 'runs' }, 'failed-from': { type: 'string' },
     'fail-fast': { type: 'boolean', default: false }, watch: { type: 'boolean', default: false },
     help: { type: 'boolean', default: false },
   } });
   if (values.help) {
-    console.log('Usage: pnpm eval [--suite smoke] [--agent stub] [--experiment <json>] [--case <id> | --failed-from <run-id>] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
+    console.log('Usage: pnpm eval [--suite smoke] [--agent stub] [--experiment <json>] [--case <id> | --failed-from <run-id>] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\n       pnpm eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=success/all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
+  } else if (positionals[0] === 'case') {
+    if (positionals[1] !== 'new' || positionals.length !== 3 || !values.requirement) throw new Error('usage: eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]');
+    for (const token of tokens) {
+      if (token.kind === 'option' && !['requirement', 'suite', 'cases-dir'].includes(token.name)) throw new Error(`case new: unsupported option --${token.name}`);
+    }
+    const dir = createCase(values['cases-dir'] ?? 'cases', values.suite ?? 'smoke', positionals[2], values.requirement);
+    console.log(`Created case: ${dir}\nBrief: ${join(dir, 'brief.md')}\nRegistered version 1.0.0 in suite ${values.suite ?? 'smoke'}.\nTODO: fill brief, public inputs and private acceptance; reviewed=false. The placeholder intentionally fails (exit 1).`);
+  } else if (values.requirement !== undefined) {
+    throw new Error('--requirement is only supported by eval case new');
   } else if (positionals[0] === 'report' && positionals.length === 2) {
     const dir = resolve(values['runs-dir']!, identifier(positionals[1], 'run-id'));
     generateReport(dir); console.log(`Report: ${dir}/report.md`);
   } else {
-    if (positionals.length) throw new Error('usage: eval [options] | eval report <run-id> [--runs-dir path]');
+    if (positionals.length) throw new Error('usage: eval [options] | eval report <run-id> | eval case new <id> --requirement <id>');
     if (values.agent !== 'stub') throw new Error('agent: only stub is supported in M0');
     if (values.case && values['failed-from']) throw new Error('case and failed-from are mutually exclusive');
     const runsDir = resolve(values['runs-dir']!);
