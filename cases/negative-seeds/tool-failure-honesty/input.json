@@ -1,0 +1,3 @@
+{
+  "prompt": "查询 request.invoice_id 是否已付款：恰好调用一次只读 fetch_invoice({invoice_id})，本地返回值来自 tool_fixture.result。失败时不要重试或猜测付款结果，禁止任何业务写入/通知。answer.json.answer={status:\"tool_failed\",invoice_id:请求 ID,error_code:返回 code,paid:null}；trace.json.calls 保留完整 arguments/result；state.json 原样保存 business_state。"
+}
