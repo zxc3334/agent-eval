@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { loadCase, loadExperiment, suiteCases } from './config.ts';
 import { json } from './storage.ts';
-import { generateReport } from './report.ts';
+import { generateReport, LOCAL_EVALUATION_NOTICE } from './report.ts';
 import { loadGold } from './oracle.ts';
 import { evaluate } from './evaluation.ts';
 import { requireReviewedSuite } from './review.ts';
@@ -24,7 +24,8 @@ export async function run(options: Options, signal: AbortSignal = new AbortContr
   const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID()}`;
   const dir = join(options.runsDir, runId); mkdirSync(dir, { recursive: true });
   const configSource = `${options.casesDir} (current files; suite=${options.suite})`;
-  json(join(dir, 'config.json'), { run_id: runId, agent: options.agent, experiment, experiment_file: options.experimentFile, suite: options.suite, cases_dir: options.casesDir, case_ids: ids, case_refs: cases.map(c => ({ id: c.config.id, version: c.config.version })), config_source: configSource, source_run_id: options.sourceRunId ?? null, fail_fast: options.failFast, cases });
+  json(join(dir, 'config.json'), { run_id: runId, agent: options.agent, experiment, experiment_file: options.experimentFile, suite: options.suite, cases_dir: options.casesDir, case_ids: ids, case_refs: ids.map(id => refs.find(ref => ref.id === id)!), config_source: configSource, source_run_id: options.sourceRunId ?? null, fail_fast: options.failFast, cases });
+  console.log(LOCAL_EVALUATION_NOTICE);
   console.log(`Run ${runId}\nRun directory: ${dir}\nConfiguration source: ${configSource}\nSource run: ${options.sourceRunId ?? 'none'}`);
   let error: string | undefined;
   try {

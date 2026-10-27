@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { loadCase, suiteCases } from './config.ts';
+import { caseFile, loadCase, suiteCases } from './config.ts';
 import { loadGold } from './oracle.ts';
 import { evaluate } from './evaluation.ts';
 import { normalizeCriteria } from './criteria.ts';
@@ -18,7 +18,7 @@ export async function validateSuite(casesDir: string, suite: string, runsDir: st
   // Snapshot the complete suite before running any reference solution/control.
   const snapshots = refs.map(ref => {
     try {
-      const file = join(casesDir, suite, ref.id, 'case.json');
+      const file = caseFile(casesDir, suite, ref);
       const hash = contentHash(file);
       const c = loadCase(casesDir, suite, ref); const gold = loadGold(c.file);
       const criteria = normalizeCriteria(c.acceptance.criteria, c.file);

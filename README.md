@@ -1,6 +1,6 @@
 # agent-eval · 本地冒烟、Case schema v2 与校验
 
-独立 TypeScript 评测仓库。支持本地确定性 **stub** 和 **Oracle 参考解**，不代表 jackson-bot 的能力；真实产品以后仅经 adapter 接入。已含 M1、E3a/b/c、E4a/b/c，本波增加 E5a Oracle 执行路径，复用同一 verifier。不接模型，不需要 API key、Docker 或 bot。
+独立 TypeScript 评测仓库。支持本地确定性 **stub** 和 **Oracle 参考解**，不代表 jackson-bot 的能力；真实产品以后仅经 adapter 接入。已含 M1、E3–E6c，复用同一 verifier。不接模型，不需要 API key、Docker 或 bot。
 
 ## 安装与第一轮
 
@@ -68,7 +68,7 @@ suite 必须引用精确 case 版本，拒绝范围、latest、缺版本和重�
 }
 ```
 
-当前目录仍为 `cases/<suite>/<id>/`；loader 检查清单版本与 case.version 完全相等，不匹配时在启动 run 前报错（exit 2）。本波不提供多版本仓库或不可变内容存储；编辑后仍可即时重跑，正式变更 case 版本时需同步更新 suite，旧 run 保留当时完整快照和 `case_refs`。
+默认目录为 `cases/<suite>/<id>/`；E6c 允许引用附加 `source`（例如 `{"id":"fixed-retrieval","version":"1.0.0","source":"seeds"}`），从 `cases/<source>/<id>/` 复用原 case。source 只能是单个目录标识符，不能是绝对路径或包含路径分隔符，符号链接不能逃出所属目录。loader 检查清单版本与 case.version 完全相等，不匹配时在启动 run 前报错（exit 2）。本波不提供多版本仓库或不可变内容存储；编辑后仍可即时重跑，正式变更 case 版本时需同步更新 suite，旧 run 保留当时完整快照和含 source 的 `case_refs`。
 
 `budgets.timeout_ms` 是已有进程超时限制（1–300000ms），`max_steps` 必须为正整数；本地 stub 固定执行一个响应步骤，多步 agent 的计步协议不在本波。`artifact_allowlist` 是输出文件名列表，当前协议必须包含 `answer.json`；只将白名单中的已生成文件复制到 artifacts，stdout/stderr 由 harness 单独保留。workspace 保留全部执行现场。当前只支持单层文件名，不支持 glob 或目录。
 
@@ -292,7 +292,7 @@ pnpm eval --suite tools --case tools-pass --agent stub  # 退出 0
 
 ## 本波边界
 
-E4c 在已有 E4a/E4b 上增加工具参数、禁写和重复副作用断言，沿用 E3c schema-only 校验和 AgentInput 隔离。借鉴 Harbor 的独立 verifier/产物分离与 Workbench 的需求→case→证据，不采用二者 runtime。E4c 阶段未实现 Oracle；E5a 的执行路径见下节。E5b 校准与 reviewed 门禁见文末。仍不实现 E6 seeds、真实 adapter、跨 run baseline 对比、公共榜、云并行、线上 QQ 或模型调用。
+E4c 在已有 E4a/E4b 上增加工具参数、禁写和重复副作用断言，沿用 E3c schema-only 校验和 AgentInput 隔离。借鉴 Harbor 的独立 verifier/产物分离与 Workbench 的需求→case→证据，不采用二者 runtime。E4c 阶段未实现 Oracle；后续 E5a/E5b 和 E6 种子接线见下文。仍不实现真实 adapter、跨 run baseline 对比、公共榜、云并行、线上 QQ 或模型调用。
 
 本机验收是 macOS arm64；Linux 使用相同 POSIX 机制但尚未实机验证，Windows 不支持本波进程组清理。不可捕获的 SIGKILL/断电不保证最后一份报告已写完；已写入的证据保留。stub 进程隔离用于生命周期管理，不是执行不可信代码的安全沙箱。
 
@@ -390,3 +390,25 @@ pnpm eval validate --schema-only   # 仍只做结构校验，不执行、不写�
 退出码：0=全部校准通过；1=Oracle 断言失败或对照检出不符合声明；2=配置/执行/环境/verifier 异常或中断（优先级最高）。运行校准只接受 `--suite`、`--cases-dir`、`--runs-dir`，输出目录必须在 cases 根目录之外；schema-only 的参数约束保持不变。
 
 E5b Issue（Notion）：https://app.notion.com/p/405e1347ee978174b338f102244ef8bd 。本票不包含 E6 seeds、真实 jackson-bot adapter、外网模型或 Harbor/Workbench runtime。
+
+## E6c：种子 smoke / full 本地接线
+
+```sh
+pnpm eval:smoke   # e6-smoke：3 条，预期 3 fail，exit 1
+pnpm eval:full    # e6-full：8 条，预期 8 fail，exit 1
+pnpm validate:e6c # 接线、证据、报告和兼容性断言，预期 exit 0
+pnpm validate:e6a # Oracle 5/5、错误对照 12/12，exit 0
+pnpm validate:e6b # Oracle 3/3、错误对照 9/9，exit 0
+```
+
+`eval:smoke` / `eval:full` 等价于 `pnpm eval --suite e6-smoke|e6-full --agent stub`，可追加 `--runs-dir`、`--case`、`--watch` 等现有参数。旧 `pnpm eval --suite smoke` 仍是两个协议样例；smoke/fields/tools/faults 清单和预期行为保持不变。
+
+smoke 选 `fixed-retrieval`（资料与事实）、`tool-result`（工具参数与产物）和 `fixture-injection`（负例、拒绝越权与状态不变）。full 覆盖 E6a 五条正例和 E6b 三条负例；只有清单，没有 case 副本，不包含 acceptance 中的错误对照。错误对照继续由 `validate:e6a` / `validate:e6b` 单独校准。
+
+**只验证评测链路（仅验评测链路），不代表产品/模型质量。** 种子的原 stub fixture 仍为未实现占位值，因此全部正常完成评分后得到 fail、退出 1；缺产物是硬断言失败，不是运行故障。`validate:e6c` 检查这个预期结果，且检查没有 timeout、agent/environment/verifier error，不把异常退出当作成功。它只在临时副本做校准与模拟审核，不修改原种子。
+
+终端和每份普通运行 `report.md` 显示上述标注，`summary.json` 包含 `evaluation_scope: "pipeline_only"`、`scope_note`、`real_agent_attempted: 0`、`real_agent_pass_rate: null`。`pass_rate` 仅表示当前本地执行结果。报告含逐例断言和 artifacts/verifier 证据路径，`pnpm eval report <run-id>` 可离线重建标注。
+
+两个新 suite 均为 `formal: false`，全部源 case 保持 `reviewed: false`。E5b 的正式审核门禁仍适用于 source 引用的每个成员；本票未授予人工审核。`--failed-from` 继续读取原种子的当前内容，watch 也监听引用目录。真实 adapter、外网模型、E7+ 和 Harbor/Workbench runtime 均未纳入。
+
+E6c Issue（Notion）：https://app.notion.com/p/405e1347ee9781ecab23ecbe1568778a

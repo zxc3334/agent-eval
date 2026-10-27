@@ -41,7 +41,7 @@ export interface Acceptance {
   error_examples: ErrorExample[];
   reviewed: boolean;
 }
-export interface CaseRef { id: string; version: string }
+export interface CaseRef { id: string; version: string; source?: string }
 export interface CaseConfig {
   schema_version: 2; id: string; version: string; type: 'positive' | 'negative';
   // Optional for existing v2 cases; authoring metadata never enters AgentInput.
