@@ -197,7 +197,7 @@ test('AgentInput projection and actual adapter payload exclude private content a
   } finally { rmSync(t.root, { recursive: true, force: true }); }
 });
 
-test('validate requires schema-only and rejects runtime flags rather than silently executing', () => {
+test('validate requires an explicit suite for calibration and schema-only rejects runtime flags', () => {
   for (const args of [
     ['validate'], ['validate', '--schema-only', 'extra'], ['--schema-only'],
     ...['watch', 'fail-fast', 'agent', 'experiment', 'runs-dir', 'case', 'failed-from', 'requirement'].map(flag => [

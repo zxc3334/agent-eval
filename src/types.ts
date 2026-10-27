@@ -29,10 +29,16 @@ export interface AgentInput {
 }
 // Reference solutions receive the fixed task state, never stub responses or acceptance.
 export type OracleInput = Omit<AgentInput, 'fixture'>;
+export interface ErrorExample {
+  answer: unknown; reason: string;
+  // Optional for legacy local v2 cases, required by calibration.
+  expected_failed_criteria?: string[];
+  files?: Record<string, string>;
+}
 export interface Acceptance {
   gold: { answer: unknown };
   criteria: (Criterion | LegacyCriterion)[];
-  error_examples: { answer: unknown; reason: string }[];
+  error_examples: ErrorExample[];
   reviewed: boolean;
 }
 export interface CaseRef { id: string; version: string }
