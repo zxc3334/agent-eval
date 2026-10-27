@@ -1,6 +1,7 @@
 import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { resolve, dirname, relative, isAbsolute, sep, win32 } from 'node:path';
 import type { LoadedCase, CaseConfig, CaseRef, Acceptance, AgentInput, ExperimentConfig } from './types.ts';
+import { normalizeCriteria } from './criteria.ts';
 
 export function readJson(file: string): any {
   try { return JSON.parse(readFileSync(file, 'utf8')); }
@@ -76,7 +77,7 @@ export function loadCase(casesDir: string, suite: string, ref: CaseRef): LoadedC
     || raw.artifact_allowlist.some((name: unknown) => typeof name !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(name)
       || ['input.json', 'stdout.log', 'stderr.log'].includes(name))
     || new Set(raw.artifact_allowlist).size !== raw.artifact_allowlist.length) bad('artifact_allowlist', 'expected unique output filenames including answer.json; input/log filenames are reserved');
-  if (raw.inject !== undefined && !['agent_error', 'protocol_error', 'timeout', 'verifier_error', 'environment_error'].includes(raw.inject)) bad('inject', 'unknown fault');
+  if (raw.inject !== undefined && !['agent_error', 'protocol_error', 'timeout', 'verifier_error', 'verifier_timeout', 'verifier_missing', 'verifier_invalid', 'environment_error'].includes(raw.inject)) bad('inject', 'unknown fault');
   const dir = dirname(file);
   const acceptanceFile = localFile(dir, raw.acceptance, 'acceptance');
   const privateFiles = [acceptanceFile, ...(briefFile ? [briefFile] : [])].map(path => statSync(path));
@@ -95,12 +96,7 @@ export function loadCase(casesDir: string, suite: string, ref: CaseRef): LoadedC
   const initialState = readJson(publicFile('initial_state'));
   if (!object(initialState)) bad('initial_state', 'expected JSON object');
   const acceptance = readJson(acceptanceFile);
-  if (!Array.isArray(acceptance?.criteria) || !acceptance.criteria.length) throw new Error(`${acceptanceFile}: criteria: expected nonempty array; fix: add at least one {id, type: "equals", expected} criterion`);
-  const seen = new Set<string>();
-  acceptance.criteria.forEach((c: any, i: number) => {
-    if (!c || typeof c.id !== 'string' || !c.id || seen.has(c.id) || c.type !== 'equals' || !Object.hasOwn(c, 'expected')) throw new Error(`${acceptanceFile}: criteria[${i}]: requires unique id, type=equals and expected; fix: supply a distinct id, type="equals" and expected value`);
-    seen.add(c.id);
-  });
+  normalizeCriteria(acceptance?.criteria, acceptanceFile);
   if (!object(acceptance.gold) || !Object.hasOwn(acceptance.gold, 'answer')) throw new Error(`${acceptanceFile}: gold.answer: required; fix: add the private gold answer`);
   if (!Array.isArray(acceptance.error_examples) || acceptance.error_examples.some((example: any) => !object(example) || !Object.hasOwn(example, 'answer') || typeof example.reason !== 'string' || !example.reason.trim())) throw new Error(`${acceptanceFile}: error_examples: expected array of { answer, reason }; fix: provide counterexamples with an answer and nonempty reason, or []`);
   if (typeof acceptance.reviewed !== 'boolean') throw new Error(`${acceptanceFile}: reviewed: expected boolean; fix: set true or false`);

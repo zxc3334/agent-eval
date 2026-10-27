@@ -2,11 +2,12 @@ import { mkdirSync, writeFileSync, appendFileSync, copyFileSync, existsSync, mkd
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { isDeepStrictEqual } from 'node:util';
 import { loadCase, loadExperiment, readJson, suiteCases } from './config.ts';
 import { json } from './storage.ts';
 import { invokeStub } from './process.ts';
 import { generateReport } from './report.ts';
+import { normalizeCriteria } from './criteria.ts';
+import { verify } from './verifier.ts';
 import type { LoadedCase, Options, Result } from './types.ts';
 
 async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal): Promise<Result> {
@@ -38,10 +39,13 @@ async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal): Promis
     const response = readJson(join(artifacts, 'answer.json'));
     if (!response || !Object.hasOwn(response, 'answer')) throw new Error('answer.json: answer: required');
     stage = 'verifier'; result.status = 'verifier_error';
-    if (c.config.inject === 'verifier_error') throw new Error('injected verifier exception');
-    result.assertions = c.acceptance.criteria.map(criterion => ({ criterion_id: criterion.id, expected: criterion.expected, actual: response.answer, passed: isDeepStrictEqual(criterion.expected, response.answer), artifact: join(artifacts, 'answer.json') }));
-    event('verifier', result.assertions);
-    result.status = result.assertions.every(a => a.passed) ? 'pass' : 'fail';
+    const verification = await verify(normalizeCriteria(c.acceptance.criteria, c.file), artifacts, caseDir, c.config.inject, signal);
+    result.verifier_result_dir = verification.result_dir;
+    result.assertions = verification.assertions;
+    event('verifier', verification);
+    if (signal.aborted) { result.status = 'environment_error'; throw new Error('interrupted by signal'); }
+    result.status = verification.status;
+    if (verification.status === 'verifier_error') throw new Error(`${verification.error_kind}: ${verification.reason}`);
   } catch (error) {
     result.stage = stage; result.reason = (error as Error).message;
     event('error', { stage, reason: result.reason });
@@ -74,7 +78,7 @@ export async function run(options: Options, signal: AbortSignal = new AbortContr
       if (signal.aborted) break;
       const result = await evaluate(c, dir, signal);
       console.log(`${result.status.toUpperCase()} ${result.case_id} ${result.duration_ms}ms`);
-      for (const a of result.assertions.filter(a => !a.passed)) console.log(`  ${a.criterion_id}: expected=${JSON.stringify(a.expected)} actual=${JSON.stringify(a.actual)}\n  artifact: ${a.artifact}`);
+      for (const a of result.assertions.filter(a => !a.passed)) console.log(`  ${a.criterion_id} [${a.mode}]: expected=${JSON.stringify(a.expected)} actual=${JSON.stringify(a.actual)}\n  reason: ${a.reason}\n  artifact: ${a.artifact}`);
       if (result.reason) console.log(`  stage=${result.stage}: ${result.reason}\n  events: ${result.events}`);
       json(join(dir, 'state.json'), { interrupted: signal.aborted }); generateReport(dir);
       if (options.failFast && result.status !== 'pass') break;
