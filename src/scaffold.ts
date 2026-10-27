@@ -32,7 +32,8 @@ export function createCase(casesDir: string, suite: string, id: string, requirem
     };
     const acceptance: Acceptance = {
       gold: { answer: 'TODO_EXPECTED_ANSWER' },
-      criteria: [{ id: 'answer-equals', type: 'equals', expected: 'TODO_EXPECTED_ANSWER' }],
+      criteria: [{ id: 'answer-equals', type: 'equals', target: { artifact: 'answer.json', field: 'answer' },
+        params: { expected: 'TODO_EXPECTED_ANSWER' }, mode: 'hard', reason: 'TODO: 解释此检查对应的需求和失败影响。' }],
       error_examples: [{ answer: 'TODO_STUB_RESPONSE', reason: 'TODO: 描述此响应如何违反验收标准。' }],
       reviewed: false,
     };
@@ -61,7 +62,7 @@ case_id: ${id}
 ## 验收标准
 
 - TODO: 写出可判定的通过条件，并对应 acceptance.json 的 criteria ID（初始为 answer-equals）。
-- TODO: 在 acceptance.json 独立填写 gold.answer 和 criteria.expected，不从公开 fixture 推导真值。
+- TODO: 在 acceptance.json 独立填写 gold.answer 和 criteria[].params.expected，不从公开 fixture 推导真值；填写 mode 和 reason。
 - 证据：本地运行的 artifacts/answer.json 与 result.json 中的断言；公开任务仅放 input.json。
 
 模板中的 stub 响应与期望值故意不同，初次运行应 FAIL（退出码 1），避免把未完成模板误当能力验收通过。
