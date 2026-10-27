@@ -1,0 +1,21 @@
+{
+  "required_fields": [
+    "destination",
+    "date"
+  ],
+  "request": {
+    "date": "2026-11-02"
+  },
+  "business_state": {
+    "bookings": [
+      {
+        "id": "booking-1",
+        "destination": "Suzhou",
+        "date": "2026-10-30"
+      }
+    ],
+    "preferences": {
+      "currency": "CNY"
+    }
+  }
+}
