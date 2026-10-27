@@ -1,13 +1,18 @@
 export type Status = 'pass' | 'fail' | 'agent_error' | 'timeout' | 'verifier_error' | 'environment_error';
 export interface LegacyCriterion { id: string; type: 'equals'; expected: unknown }
 export interface EvidenceRef { artifact: string; field: string }
-export interface Criterion {
-  id: string; type: 'equals'; target: { artifact: 'answer.json'; field: 'answer' };
-  params: { expected: unknown }; mode: 'hard' | 'diagnostic'; reason: string;
+interface CriterionBase {
+  id: string; target: { artifact: string; field: string };
+  mode: 'hard' | 'diagnostic'; reason: string;
 }
+export type Criterion = CriterionBase & (
+  | { type: 'equals'; params: { expected: unknown } }
+  | { type: 'json_parseable'; params: Record<string, never> }
+  | { type: 'fields_preserved'; params: { baseline: unknown; fields: string[] } }
+);
 export type VerifierFault = 'verifier_error' | 'verifier_timeout' | 'verifier_missing' | 'verifier_invalid';
 export interface Budgets { timeout_ms: number; max_steps: number }
-export interface Fixture { answer: unknown; delay_ms?: number }
+export interface Fixture { answer: unknown; delay_ms?: number; files?: Record<string, string> }
 // The complete adapter-facing payload. Never spread a LoadedCase into this object.
 export interface AgentInput {
   prompt: string;
@@ -41,7 +46,7 @@ export interface ExperimentConfig {
 export interface Assertion {
   criterion_id: string; expected: unknown; actual: unknown; passed: boolean; artifact: string;
   type: Criterion['type']; target: Criterion['target']; params: Criterion['params'];
-  mode: Criterion['mode']; reason: string; evidence: EvidenceRef[];
+  mode: Criterion['mode']; reason: string; evidence: EvidenceRef[]; problem?: string;
 }
 export interface Result {
   case_id: string; status: Status; duration_ms: number; assertions: Assertion[];

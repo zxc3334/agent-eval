@@ -33,7 +33,7 @@ export function generateReport(dir: string) {
     lines.push(`## ${r.case_id}: ${r.status} (${r.duration_ms}ms)`, '', `Events: ${r.events}`, '');
     if (r.reason) lines.push(`Stage: ${r.stage}; reason: ${r.reason}`, '');
     if (r.verifier_result_dir) lines.push(`Verifier result: ${r.verifier_result_dir}`, '');
-    for (const a of r.assertions) lines.push(`- ${a.criterion_id} [${a.mode ?? 'hard'}]: ${a.passed ? 'pass' : 'fail'}; expected=${JSON.stringify(a.expected)}; actual=${JSON.stringify(a.actual)}; artifact: ${a.artifact}${a.reason ? `; reason: ${a.reason}; target=${JSON.stringify(a.target)}; params=${JSON.stringify(a.params)}; evidence=${JSON.stringify(a.evidence)}` : ''}`);
+    for (const a of r.assertions) lines.push(`- ${a.criterion_id} [${a.mode ?? 'hard'}]: ${a.passed ? 'pass' : 'fail'}; expected=${JSON.stringify(a.expected)}; actual=${JSON.stringify(a.actual)}; artifact: ${a.artifact}${a.reason ? `; reason: ${a.reason}; target=${JSON.stringify(a.target)}; params=${JSON.stringify(a.params)}; evidence=${JSON.stringify(a.evidence)}${a.problem ? `; problem: ${a.problem}` : ''}` : ''}`);
     lines.push('');
   }
   writeFileSync(join(dir, 'report.md'), lines.join('\n'));

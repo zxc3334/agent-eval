@@ -1,0 +1,6 @@
+{
+  "answer": "Updated configuration.",
+  "files": {
+    "config.json": "{\"theme\": \"dark\", \"profile\": {\"owner\": \"Grace\", \"labels\": [\"local\", \"demo\"]}, \"enabled\": false, \"nullable\": null}"
+  }
+}

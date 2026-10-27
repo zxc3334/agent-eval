@@ -78,7 +78,7 @@ export async function run(options: Options, signal: AbortSignal = new AbortContr
       if (signal.aborted) break;
       const result = await evaluate(c, dir, signal);
       console.log(`${result.status.toUpperCase()} ${result.case_id} ${result.duration_ms}ms`);
-      for (const a of result.assertions.filter(a => !a.passed)) console.log(`  ${a.criterion_id} [${a.mode}]: expected=${JSON.stringify(a.expected)} actual=${JSON.stringify(a.actual)}\n  reason: ${a.reason}\n  artifact: ${a.artifact}`);
+      for (const a of result.assertions.filter(a => !a.passed)) console.log(`  ${a.criterion_id} [${a.mode}]: expected=${JSON.stringify(a.expected)} actual=${JSON.stringify(a.actual)}\n  reason: ${a.reason}${a.problem ? `\n  problem: ${a.problem}` : ''}\n  artifact: ${a.artifact}`);
       if (result.reason) console.log(`  stage=${result.stage}: ${result.reason}\n  events: ${result.events}`);
       json(join(dir, 'state.json'), { interrupted: signal.aborted }); generateReport(dir);
       if (options.failFast && result.status !== 'pass') break;
