@@ -12,7 +12,10 @@
   "error_examples": [
     {
       "answer": "wrong",
-      "reason": "Does not match the required greeting."
+      "reason": "Does not match the required greeting.",
+      "expected_failed_criteria": [
+        "answer-equals"
+      ]
     }
   ],
   "reviewed": false

@@ -42,6 +42,7 @@ export function suiteCases(casesDir: string, suite: string): CaseRef[] {
   const file = localFile(casesDir, `${suite}/suite.json`, 'suite', resolve(casesDir, suite, 'suite.json'));
   const data = readJson(file);
   if (data?.schema_version !== 2) throw new Error(`${file}: schema_version: expected 2; migrate v1 suite; fix: use schema_version=2 and {id, version} references`);
+  if (data.formal !== undefined && typeof data.formal !== 'boolean') throw new Error(`${file}: formal: expected boolean; fix: set formal=true for a reviewed suite or false for local iteration`);
   if (!Array.isArray(data.cases) || !data.cases.length) throw new Error(`${file}: cases: expected nonempty reference array; fix: add at least one {id, version} reference`);
   const refs = data.cases.map((ref: any, i: number): CaseRef => ({
     id: identifier(ref?.id, `${file}: cases[${i}].id`),
@@ -108,6 +109,18 @@ export function loadCase(casesDir: string, suite: string, ref: CaseRef): LoadedC
   }
   if (!object(acceptance.gold) || !Object.hasOwn(acceptance.gold, 'answer')) throw new Error(`${acceptanceFile}: gold.answer: required; fix: add the private gold answer`);
   if (!Array.isArray(acceptance.error_examples) || acceptance.error_examples.some((example: any) => !object(example) || !Object.hasOwn(example, 'answer') || typeof example.reason !== 'string' || !example.reason.trim())) throw new Error(`${acceptanceFile}: error_examples: expected array of { answer, reason }; fix: provide counterexamples with an answer and nonempty reason, or []`);
+  for (const [i, example] of acceptance.error_examples.entries()) {
+    const expected = example.expected_failed_criteria;
+    if (expected !== undefined && (!Array.isArray(expected) || !expected.length
+      || expected.some((id: unknown) => typeof id !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(id))
+      || new Set(expected).size !== expected.length)) {
+      throw new Error(`${acceptanceFile}: error_examples[${i}].expected_failed_criteria: expected nonempty unique criterion IDs; fix: declare exactly the hard criteria this control must fail`);
+    }
+    if (example.files !== undefined && (!object(example.files) || Object.entries(example.files).some(([name, content]) =>
+      !raw.artifact_allowlist.includes(name) || ['answer.json', 'resource.json'].includes(name) || typeof content !== 'string'))) {
+      throw new Error(`${acceptanceFile}: error_examples[${i}].files: expected allowlisted output filename to text mapping; fix: use output filenames other than answer.json/resource.json and string contents`);
+    }
+  }
   if (typeof acceptance.reviewed !== 'boolean') throw new Error(`${acceptanceFile}: reviewed: expected boolean; fix: set true or false`);
   // Explicit projection is the public/private boundary; no case/acceptance/experiment spread.
   const input: AgentInput = {
