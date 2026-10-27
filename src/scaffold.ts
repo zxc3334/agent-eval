@@ -42,6 +42,21 @@ export function createCase(casesDir: string, suite: string, id: string, requirem
     json(join(dir, 'fixture.json'), { answer: 'TODO_STUB_RESPONSE' });
     json(join(dir, 'initial-state.json'), {});
     json(join(dir, 'acceptance.json'), acceptance);
+    writeFileSync(join(dir, 'gold.md'), `# Gold: ${id}
+
+TODO: 根据需求独立编写 solve.ts，解释如何从 initial_state 得到产物。
+不要读取 acceptance.json 或导入 verifier 的业务实现。Gold 与 verifier 必须独立实现。
+运行 pnpm eval --suite ${suite} --case ${id} --agent oracle，检查 artifacts/ 与 verifier/ 的证据。
+当前 solve.ts 故意输出 TODO_REFERENCE_ANSWER，与验收期望不同，Oracle 也应失败。
+reviewed 不控制本地执行；本模板不提供审核门禁。
+`);
+    writeFileSync(join(dir, 'solve.ts'), `import { readFileSync, writeFileSync } from 'node:fs';
+
+const input = JSON.parse(readFileSync('input.json', 'utf8'));
+// TODO: use input.initial_state to implement the task independently of acceptance.
+void input;
+writeFileSync('answer.json', JSON.stringify({ answer: 'TODO_REFERENCE_ANSWER', success: true }));
+`);
     writeFileSync(join(dir, 'brief.md'), `# Case brief: ${id}
 
 requirement_id: ${requirementId}
@@ -64,6 +79,7 @@ case_id: ${id}
 - TODO: 写出可判定的通过条件，并对应 acceptance.json 的 criteria ID（初始为 answer-equals）。
 - TODO: 在 acceptance.json 独立填写 gold.answer 和 criteria[].params.expected，不从公开 fixture 推导真值；填写 mode 和 reason。
 - 证据：本地运行的 artifacts/answer.json 与 result.json 中的断言；公开任务仅放 input.json。
+- TODO: 在 gold.md 解释参考解，并独立实现 solve.ts；使用 --agent oracle 经同一 verifier 验证。
 
 模板中的 stub 响应与期望值故意不同，初次运行应 FAIL（退出码 1），避免把未完成模板误当能力验收通过。
 `);

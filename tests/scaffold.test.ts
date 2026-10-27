@@ -23,7 +23,7 @@ test('case new generates a linked private brief and a runnable v2 template in a 
     assert.equal(c.config.schema_version, 2);
     assert.equal(c.acceptance.reviewed, false);
     const dir = join(cases, 'local/draft');
-    assert.deepEqual(readdirSync(dir).sort(), ['acceptance.json', 'brief.md', 'case.json', 'fixture.json', 'initial-state.json', 'input.json']);
+    assert.deepEqual(readdirSync(dir).sort(), ['acceptance.json', 'brief.md', 'case.json', 'fixture.json', 'gold.md', 'initial-state.json', 'input.json', 'solve.ts']);
     const brief = readFileSync(join(dir, c.config.brief!), 'utf8');
     for (const text of ['requirement_id: REQ-42', '目标行为', '退化信号', '验收标准', 'answer-equals']) assert.ok(brief.includes(text), text);
     // Private sentinels must stay out of the actual serialized adapter input/workspace.

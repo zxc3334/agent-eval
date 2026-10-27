@@ -27,6 +27,8 @@ export interface AgentInput {
   artifact_allowlist: string[];
   budgets: Budgets;
 }
+// Reference solutions receive the fixed task state, never stub responses or acceptance.
+export type OracleInput = Omit<AgentInput, 'fixture'>;
 export interface Acceptance {
   gold: { answer: unknown };
   criteria: (Criterion | LegacyCriterion)[];
@@ -47,7 +49,7 @@ export interface LoadedCase {
 }
 // Execution choices belong to the harness, not to the task presented to the agent.
 export interface ExperimentConfig {
-  adapter: 'stub'; model: string | null; product: Record<string, unknown>;
+  adapter: 'stub' | 'oracle'; model: string | null; product: Record<string, unknown>;
 }
 export interface Assertion {
   criterion_id: string; expected: unknown; actual: unknown; passed: boolean; artifact: string;

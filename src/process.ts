@@ -4,9 +4,14 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export async function invokeStub(workspace: string, artifacts: string, temp: string, timeout: number, inject: string | undefined, signal: AbortSignal): Promise<{ code: number | null; timedOut: boolean; error?: string }> {
+  return invokeNode(workspace, artifacts, temp, timeout, [fileURLToPath(new URL('./stub.ts', import.meta.url)), inject ?? 'normal'], signal);
+}
+
+// Shared process lifecycle only: executors produce evidence; the verifier owns grading.
+export async function invokeNode(workspace: string, artifacts: string, temp: string, timeout: number, args: string[], signal: AbortSignal): Promise<{ code: number | null; timedOut: boolean; error?: string }> {
   return new Promise(resolve => {
     let timedOut = false; let error: string | undefined; let stopping = false;
-    const child = spawn(process.execPath, [fileURLToPath(new URL('./stub.ts', import.meta.url)), inject ?? 'normal'], {
+    const child = spawn(process.execPath, args, {
       cwd: workspace, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, AGENT_EVAL_TEMP: temp },
     });
