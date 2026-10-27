@@ -1,0 +1,71 @@
+{
+  "gold": {
+    "answer": "Completed."
+  },
+  "criteria": [
+    {
+      "id": "fact",
+      "type": "equals",
+      "target": {
+        "artifact": "retrieval.json",
+        "field": "/retention_days"
+      },
+      "params": {
+        "expected": 30
+      },
+      "mode": "hard",
+      "reason": "引用指定版本的保留天数。"
+    },
+    {
+      "id": "source",
+      "type": "equals",
+      "target": {
+        "artifact": "retrieval.json",
+        "field": "/source_id"
+      },
+      "params": {
+        "expected": "ops-v3"
+      },
+      "mode": "hard",
+      "reason": "来源必须可追溯。"
+    },
+    {
+      "id": "revision",
+      "type": "equals",
+      "target": {
+        "artifact": "retrieval.json",
+        "field": "/revision"
+      },
+      "params": {
+        "expected": 3
+      },
+      "mode": "hard",
+      "reason": "禁止用旧版本。"
+    }
+  ],
+  "error_examples": [
+    {
+      "answer": "Completed.",
+      "reason": "返回旧版资料。",
+      "expected_failed_criteria": [
+        "fact",
+        "source",
+        "revision"
+      ],
+      "files": {
+        "retrieval.json": "{\"retention_days\": 7, \"source_id\": \"ops-v2\", \"revision\": 2}"
+      }
+    },
+    {
+      "answer": "Completed.",
+      "reason": "事实正确但伪造来源。",
+      "expected_failed_criteria": [
+        "source"
+      ],
+      "files": {
+        "retrieval.json": "{\"retention_days\": 30, \"source_id\": \"memory\", \"revision\": 3}"
+      }
+    }
+  ],
+  "reviewed": false
+}

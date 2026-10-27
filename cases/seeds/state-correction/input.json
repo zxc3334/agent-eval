@@ -1,0 +1,3 @@
+{
+  "prompt": "按 initial_state.turns 数组顺序重放用户修改。每轮只覆盖 changes 中的字段，后续修改覆盖旧值，其余状态保留。写 state.json 为最终状态，history.json.snapshots 为每轮 {turn_id,state} 完整快照。无需真实聊天 session，不执行预订。"
+}

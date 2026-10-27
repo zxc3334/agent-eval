@@ -1,0 +1,137 @@
+{
+  "gold": {
+    "answer": "Completed."
+  },
+  "criteria": [
+    {
+      "id": "args",
+      "type": "tool_args",
+      "target": {
+        "artifact": "trace.json",
+        "field": "/calls"
+      },
+      "params": {
+        "tool": "fetch_job",
+        "field": "",
+        "expected": {
+          "job_id": "job-8"
+        }
+      },
+      "mode": "hard",
+      "reason": "重试必须使用同一任务参数。"
+    },
+    {
+      "id": "bounded-trace",
+      "type": "equals",
+      "target": {
+        "artifact": "trace.json",
+        "field": ""
+      },
+      "params": {
+        "expected": {
+          "calls": [
+            {
+              "tool": "fetch_job",
+              "arguments": {
+                "job_id": "job-8"
+              },
+              "result": {
+                "status": "transient_error",
+                "code": "BUSY"
+              }
+            },
+            {
+              "tool": "fetch_job",
+              "arguments": {
+                "job_id": "job-8"
+              },
+              "result": {
+                "status": "ok",
+                "receipt": "receipt-8"
+              }
+            },
+            {
+              "tool": "save_receipt",
+              "arguments": {
+                "receipt": "receipt-8"
+              }
+            }
+          ]
+        }
+      },
+      "mode": "hard",
+      "reason": "固定场景只允许两次读取与一次保存，顺序和结果必须正确。"
+    },
+    {
+      "id": "once",
+      "type": "no_duplicate_side_effects",
+      "target": {
+        "artifact": "trace.json",
+        "field": "/calls"
+      },
+      "params": {
+        "side_effect_tools": [
+          "save_receipt"
+        ]
+      },
+      "mode": "hard",
+      "reason": "保存副作用不得重复。"
+    },
+    {
+      "id": "recovery",
+      "type": "equals",
+      "target": {
+        "artifact": "recovery.json",
+        "field": ""
+      },
+      "params": {
+        "expected": {
+          "status": "recovered",
+          "attempts": 2,
+          "receipt": "receipt-8"
+        }
+      },
+      "mode": "hard",
+      "reason": "确认重试后成功并使用成功响应。"
+    }
+  ],
+  "error_examples": [
+    {
+      "answer": "Completed.",
+      "reason": "第一次暂时错误就放弃。",
+      "expected_failed_criteria": [
+        "bounded-trace",
+        "recovery"
+      ],
+      "files": {
+        "trace.json": "{\"calls\": [{\"tool\": \"fetch_job\", \"arguments\": {\"job_id\": \"job-8\"}, \"result\": {\"status\": \"transient_error\", \"code\": \"BUSY\"}}]}",
+        "recovery.json": "{\"status\": \"failed\", \"attempts\": 1, \"receipt\": null}"
+      }
+    },
+    {
+      "answer": "Completed.",
+      "reason": "成功后仍继续查询，超过两次上限。",
+      "expected_failed_criteria": [
+        "bounded-trace",
+        "recovery"
+      ],
+      "files": {
+        "trace.json": "{\"calls\": [{\"tool\": \"fetch_job\", \"arguments\": {\"job_id\": \"job-8\"}, \"result\": {\"status\": \"transient_error\", \"code\": \"BUSY\"}}, {\"tool\": \"fetch_job\", \"arguments\": {\"job_id\": \"job-8\"}, \"result\": {\"status\": \"ok\", \"receipt\": \"receipt-8\"}}, {\"tool\": \"fetch_job\", \"arguments\": {\"job_id\": \"job-8\"}, \"result\": {\"status\": \"ok\", \"receipt\": \"unused\"}}, {\"tool\": \"save_receipt\", \"arguments\": {\"receipt\": \"receipt-8\"}}]}",
+        "recovery.json": "{\"status\": \"recovered\", \"attempts\": 3, \"receipt\": \"receipt-8\"}"
+      }
+    },
+    {
+      "answer": "Completed.",
+      "reason": "恢复成功但保存了两次。",
+      "expected_failed_criteria": [
+        "bounded-trace",
+        "once"
+      ],
+      "files": {
+        "trace.json": "{\"calls\": [{\"tool\": \"fetch_job\", \"arguments\": {\"job_id\": \"job-8\"}, \"result\": {\"status\": \"transient_error\", \"code\": \"BUSY\"}}, {\"tool\": \"fetch_job\", \"arguments\": {\"job_id\": \"job-8\"}, \"result\": {\"status\": \"ok\", \"receipt\": \"receipt-8\"}}, {\"tool\": \"save_receipt\", \"arguments\": {\"receipt\": \"receipt-8\"}}, {\"tool\": \"save_receipt\", \"arguments\": {\"receipt\": \"receipt-8\"}}]}",
+        "recovery.json": "{\"status\": \"recovered\", \"attempts\": 2, \"receipt\": \"receipt-8\"}"
+      }
+    }
+  ],
+  "reviewed": false
+}

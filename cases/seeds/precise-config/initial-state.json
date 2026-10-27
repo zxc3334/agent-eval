@@ -1,0 +1,22 @@
+{
+  "config": {
+    "service": "notifier",
+    "retry": {
+      "max_attempts": 3,
+      "backoff_ms": 250
+    },
+    "logging": {
+      "level": "info",
+      "redact": true
+    },
+    "labels": [
+      "local",
+      "seed"
+    ],
+    "enabled": false,
+    "nullable": null
+  },
+  "request": {
+    "max_attempts": 5
+  }
+}
