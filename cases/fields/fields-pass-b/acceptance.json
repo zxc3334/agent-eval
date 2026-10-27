@@ -1,0 +1,91 @@
+{
+  "gold": {
+    "answer": {
+      "theme": "dark",
+      "profile": {
+        "owner": "Ada",
+        "labels": [
+          "local",
+          "demo"
+        ]
+      },
+      "enabled": false,
+      "nullable": null
+    }
+  },
+  "criteria": [
+    {
+      "id": "config-json",
+      "type": "json_parseable",
+      "target": {
+        "artifact": "config.json",
+        "field": ""
+      },
+      "params": {},
+      "mode": "hard",
+      "reason": "The requested configuration file must exist and be parseable JSON."
+    },
+    {
+      "id": "theme-updated",
+      "type": "equals",
+      "target": {
+        "artifact": "config.json",
+        "field": "/theme"
+      },
+      "params": {
+        "expected": "dark"
+      },
+      "mode": "hard",
+      "reason": "Set the theme to dark."
+    },
+    {
+      "id": "unrelated-kept",
+      "type": "fields_preserved",
+      "target": {
+        "artifact": "config.json",
+        "field": ""
+      },
+      "params": {
+        "baseline": {
+          "theme": "light",
+          "profile": {
+            "owner": "Ada",
+            "labels": [
+              "local",
+              "demo"
+            ]
+          },
+          "enabled": false,
+          "nullable": null
+        },
+        "fields": [
+          "/profile",
+          "/enabled",
+          "/nullable"
+        ]
+      },
+      "mode": "hard",
+      "reason": "Keep the unrelated profile, enabled and nullable fields unchanged."
+    },
+    {
+      "id": "wording-hint",
+      "type": "equals",
+      "target": {
+        "artifact": "answer.json",
+        "field": "answer"
+      },
+      "params": {
+        "expected": "Updated configuration."
+      },
+      "mode": "diagnostic",
+      "reason": "Wording is informative; artifact evidence determines task success."
+    }
+  ],
+  "error_examples": [
+    {
+      "answer": "success: updated configuration to dark",
+      "reason": "Keywords do not prove that config.json exists or preserves unrelated fields."
+    }
+  ],
+  "reviewed": false
+}

@@ -1,0 +1,6 @@
+{
+  "answer": "Done — the theme is now dark.",
+  "files": {
+    "config.json": "{\"nullable\":null,\"enabled\":false,\"profile\":{\"labels\":[\"local\",\"demo\"],\"owner\":\"Ada\"},\"theme\":\"dark\",\"note\":\"optional metadata\"}"
+  }
+}

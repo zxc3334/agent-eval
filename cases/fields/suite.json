@@ -1,0 +1,25 @@
+{
+  "schema_version": 2,
+  "cases": [
+    {
+      "id": "fields-pass-a",
+      "version": "1.0.0"
+    },
+    {
+      "id": "fields-pass-b",
+      "version": "1.0.0"
+    },
+    {
+      "id": "fields-missing",
+      "version": "1.0.0"
+    },
+    {
+      "id": "fields-malformed",
+      "version": "1.0.0"
+    },
+    {
+      "id": "fields-clobbered",
+      "version": "1.0.0"
+    }
+  ]
+}

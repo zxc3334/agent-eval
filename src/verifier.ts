@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { isDeepStrictEqual } from 'node:util';
-import { assertJsonValue, record } from './criteria.ts';
+import { assertJsonValue, criterionExpected, normalizeCriteria, record } from './criteria.ts';
 import { json } from './storage.ts';
 import type { Assertion, Criterion, CaseConfig } from './types.ts';
 
@@ -35,14 +35,17 @@ export function validateVerifierOutput(raw: unknown, criteria: Criterion[], arti
     if (!row || !Object.hasOwn(row, 'expected') || !Object.hasOwn(row, 'actual') || !Object.hasOwn(row, 'passed') || !Object.hasOwn(row, 'evidence')) {
       throw new VerifierError('missing_result', `criterion ${c.id}: expected/actual/passed/evidence result is missing`);
     }
-    if (typeof row.passed !== 'boolean' || !isDeepStrictEqual(row.expected, c.params.expected)) {
+    if (typeof row.passed !== 'boolean' || !isDeepStrictEqual(row.expected, criterionExpected(c))) {
       throw new VerifierError('invalid_result', `criterion ${c.id}: invalid verdict or expected value`);
+    }
+    if (row.problem !== undefined && (typeof row.problem !== 'string' || !row.problem.trim() || row.passed)) {
+      throw new VerifierError('invalid_result', `criterion ${c.id}: invalid problem diagnostic`);
     }
     const artifact = join(artifacts, c.target.artifact);
     const evidence = [{ artifact, field: c.target.field }];
     if (!isDeepStrictEqual(row.evidence, evidence)) throw new VerifierError('invalid_result', `criterion ${c.id}: invalid evidence reference`);
     return { criterion_id: c.id, type: c.type, target: c.target, params: c.params, mode: c.mode, reason: c.reason,
-      expected: row.expected, actual: row.actual, passed: row.passed, artifact, evidence };
+      expected: row.expected, actual: row.actual, passed: row.passed, artifact, evidence, ...(row.problem === undefined ? {} : { problem: row.problem }) };
   });
 }
 
@@ -74,7 +77,8 @@ export async function verify(criteria: Criterion[], artifacts: string, caseDir: 
   json(join(resultDir, 'input.json'), { criteria, artifacts, timeout_ms: VERIFIER_TIMEOUT_MS });
   let result: Verification;
   try {
-    const raw = await executeVerifier(criteria, artifacts, inject, signal);
+    const normalized = normalizeCriteria(criteria, 'verifier input');
+    const raw = await executeVerifier(normalized, artifacts, inject, signal);
     const assertions = validateVerifierOutput(raw, criteria, artifacts);
     json(join(resultDir, 'output.json'), raw);
     result = { status: assertions.filter(a => a.mode === 'hard').every(a => a.passed) ? 'pass' : 'fail', assertions, result_dir: resultDir };

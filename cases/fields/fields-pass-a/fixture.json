@@ -1,0 +1,6 @@
+{
+  "answer": "Updated configuration.",
+  "files": {
+    "config.json": "{\n  \"theme\": \"dark\",\n  \"profile\": {\n    \"owner\": \"Ada\",\n    \"labels\": [\n      \"local\",\n      \"demo\"\n    ]\n  },\n  \"enabled\": false,\n  \"nullable\": null\n}"
+  }
+}
