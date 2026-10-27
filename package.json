@@ -7,6 +7,9 @@
   "packageManager": "pnpm@11.19.0",
   "scripts": {
     "eval": "node src/cli.ts",
+    "eval:smoke": "node src/cli.ts --suite e6-smoke --agent stub",
+    "eval:full": "node src/cli.ts --suite e6-full --agent stub",
+    "validate:e6c": "node --test --test-concurrency=1 tests/seed-suites.test.ts",
     "validate:e6a": "node src/seed-validation.ts",
     "validate:e6b": "node src/negative-seed-validation.ts",
     "test": "node --test --test-concurrency=1 tests/*.test.ts",

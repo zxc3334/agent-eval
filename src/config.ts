@@ -47,6 +47,7 @@ export function suiteCases(casesDir: string, suite: string): CaseRef[] {
   const refs = data.cases.map((ref: any, i: number): CaseRef => ({
     id: identifier(ref?.id, `${file}: cases[${i}].id`),
     version: exactVersion(ref?.version, `${file}: cases[${i}].version`),
+    ...(ref?.source === undefined ? {} : { source: identifier(ref.source, `${file}: cases[${i}].source`) }),
   }));
   const seen = new Set<string>();
   refs.forEach((ref: CaseRef, i: number) => {
@@ -55,12 +56,18 @@ export function suiteCases(casesDir: string, suite: string): CaseRef[] {
   });
   return refs;
 }
-export function loadCase(casesDir: string, suite: string, ref: CaseRef): LoadedCase {
+// A source is a sibling collection under casesDir, never an arbitrary path.
+export function caseFile(casesDir: string, suite: string, ref: CaseRef): string {
   const suiteFile = resolve(casesDir, suite, 'suite.json');
   identifier(suite, `${suiteFile}: suite`); identifier(ref.id, `${suiteFile}: cases.id`);
-  const file = localFile(casesDir, `${suite}/${ref.id}/case.json`, `cases[${ref.id}]`, suiteFile);
-  localFile(resolve(casesDir, suite), `${ref.id}/case.json`, `cases[${ref.id}]`, suiteFile);
+  const source = ref.source === undefined ? suite : identifier(ref.source, `${suiteFile}: cases.source`);
+  const file = localFile(casesDir, `${source}/${ref.id}/case.json`, `cases[${ref.id}]`, suiteFile);
+  localFile(resolve(casesDir, source), `${ref.id}/case.json`, `cases[${ref.id}]`, suiteFile);
   localFile(dirname(file), 'case.json', 'case', file);
+  return file;
+}
+export function loadCase(casesDir: string, suite: string, ref: CaseRef): LoadedCase {
+  const file = caseFile(casesDir, suite, ref);
   const raw = readJson(file);
   const bad = (field: string, message: string): never => { throw new Error(`${file}: ${field}: ${message}; fix: update ${field} to satisfy this requirement`); };
   if (raw?.schema_version !== 2) bad('schema_version', 'expected 2; migrate v1 case');

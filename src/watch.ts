@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { caseFile, suiteCases } from './config.ts';
 import { run } from './runner.ts';
 import type { Options } from './types.ts';
 
@@ -25,6 +26,13 @@ function fingerprint(options: Options): string {
   const selected = options.selectedIds ?? (options.caseId ? [options.caseId] : undefined);
   if (selected) selected.forEach(id => visit(join(suiteDir, id)));
   else visit(suiteDir);
+  try {
+    for (const ref of suiteCases(options.casesDir, options.suite)) {
+      if (ref.source && (!selected || selected.includes(ref.id))) {
+        visit(dirname(caseFile(options.casesDir, options.suite, ref)));
+      }
+    }
+  } catch (e) { hash.update(String(e)); }
   return hash.digest('hex');
 }
 

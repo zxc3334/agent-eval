@@ -15,7 +15,7 @@ test('E6b correct negative behavior passes full calibration; all nine wrong cont
   const cases = join(root, 'cases'); const runs = join(root, 'runs');
   const refs = stageSeeds(resolve('cases/negative-seeds'), cases, 'e6b');
   assert.deepEqual(refs.map(ref => ref.id), ['fixture-injection', 'missing-clarification', 'tool-failure-honesty']);
-  assert.equal(existsSync('cases/negative-seeds/suite.json'), false, 'E6c registration is out of scope');
+  assert.equal(existsSync('cases/negative-seeds/suite.json'), false, 'source collection stays separate from suite manifests');
   for (const ref of refs) {
     const c = loadCase(cases, 'e6b', ref);
     assert.equal(c.config.type, 'negative');

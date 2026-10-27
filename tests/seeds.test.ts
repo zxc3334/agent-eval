@@ -15,7 +15,7 @@ test('five E6a seeds calibrate through the CLI, preserve evidence isolation and 
   const cases = join(root, 'cases'); const runs = join(root, 'runs');
   const refs = stageSeeds(resolve('cases/seeds'), cases);
   assert.deepEqual(refs.map(r => r.id), ['bounded-recovery', 'fixed-retrieval', 'precise-config', 'state-correction', 'tool-result']);
-  assert.equal(existsSync('cases/seeds/suite.json'), false, 'E6c registration stays out of scope');
+  assert.equal(existsSync('cases/seeds/suite.json'), false, 'source collection stays separate from suite manifests');
   let controls = 0;
   for (const ref of refs) {
     const c = loadCase(cases, 'e6a', ref);
