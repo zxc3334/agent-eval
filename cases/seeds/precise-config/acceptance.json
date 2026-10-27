@@ -1,0 +1,122 @@
+{
+  "gold": {
+    "answer": "Completed."
+  },
+  "criteria": [
+    {
+      "id": "json",
+      "type": "json_parseable",
+      "target": {
+        "artifact": "config.json",
+        "field": ""
+      },
+      "params": {},
+      "mode": "hard",
+      "reason": "产物必须是合法 JSON。"
+    },
+    {
+      "id": "edit",
+      "type": "equals",
+      "target": {
+        "artifact": "config.json",
+        "field": "/retry/max_attempts"
+      },
+      "params": {
+        "expected": 5
+      },
+      "mode": "hard",
+      "reason": "修改唯一目标。"
+    },
+    {
+      "id": "preserved",
+      "type": "fields_preserved",
+      "target": {
+        "artifact": "config.json",
+        "field": ""
+      },
+      "params": {
+        "baseline": {
+          "service": "notifier",
+          "retry": {
+            "max_attempts": 3,
+            "backoff_ms": 250
+          },
+          "logging": {
+            "level": "info",
+            "redact": true
+          },
+          "labels": [
+            "local",
+            "seed"
+          ],
+          "enabled": false,
+          "nullable": null
+        },
+        "fields": [
+          "/service",
+          "/retry/backoff_ms",
+          "/logging",
+          "/labels",
+          "/enabled",
+          "/nullable"
+        ]
+      },
+      "mode": "hard",
+      "reason": "保留所有非目标字段。"
+    },
+    {
+      "id": "exact",
+      "type": "equals",
+      "target": {
+        "artifact": "config.json",
+        "field": ""
+      },
+      "params": {
+        "expected": {
+          "service": "notifier",
+          "retry": {
+            "max_attempts": 5,
+            "backoff_ms": 250
+          },
+          "logging": {
+            "level": "info",
+            "redact": true
+          },
+          "labels": [
+            "local",
+            "seed"
+          ],
+          "enabled": false,
+          "nullable": null
+        }
+      },
+      "mode": "hard",
+      "reason": "不允许额外字段或其他结构变化。"
+    }
+  ],
+  "error_examples": [
+    {
+      "answer": "Completed.",
+      "reason": "声称完成但没有修改配置。",
+      "expected_failed_criteria": [
+        "edit",
+        "exact"
+      ],
+      "files": {
+        "config.json": "{\"service\": \"notifier\", \"retry\": {\"max_attempts\": 3, \"backoff_ms\": 250}, \"logging\": {\"level\": \"info\", \"redact\": true}, \"labels\": [\"local\", \"seed\"], \"enabled\": false, \"nullable\": null}"
+      }
+    },
+    {
+      "answer": "Completed.",
+      "reason": "目标正确但顺带修改日志级别。",
+      "expected_failed_criteria": [
+        "preserved",
+        "exact"
+      ],
+      "files": {
+        "config.json": "{\"service\": \"notifier\", \"retry\": {\"max_attempts\": 5, \"backoff_ms\": 250}, \"logging\": {\"level\": \"debug\", \"redact\": true}, \"labels\": [\"local\", \"seed\"], \"enabled\": false, \"nullable\": null}"
+      }
+    }
+  ],
+  "reviewed": false
+}

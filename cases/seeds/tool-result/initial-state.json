@@ -1,0 +1,20 @@
+{
+  "request": {
+    "sku": "tea-42",
+    "currency": "CNY",
+    "quantity": 3
+  },
+  "tool_fixture": {
+    "tool": "quote",
+    "arguments": {
+      "sku": "tea-42",
+      "currency": "CNY"
+    },
+    "result": {
+      "quote_id": "q-17",
+      "sku": "tea-42",
+      "currency": "CNY",
+      "unit_price_cents": 1250
+    }
+  }
+}

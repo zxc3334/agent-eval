@@ -1,0 +1,33 @@
+{
+  "state": {
+    "destination": "Hangzhou",
+    "date": "2026-11-01",
+    "travelers": 1,
+    "preferences": {
+      "seat": "window",
+      "language": "zh-CN"
+    }
+  },
+  "turns": [
+    {
+      "id": 1,
+      "changes": {
+        "destination": "Suzhou",
+        "date": "2026-11-03"
+      }
+    },
+    {
+      "id": 2,
+      "changes": {
+        "destination": "Nanjing"
+      }
+    },
+    {
+      "id": 3,
+      "changes": {
+        "travelers": 2,
+        "date": "2026-11-04"
+      }
+    }
+  ]
+}

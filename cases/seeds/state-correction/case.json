@@ -1,0 +1,21 @@
+{
+  "schema_version": 2,
+  "id": "state-correction",
+  "version": "1.0.0",
+  "type": "positive",
+  "requirement_id": "REQ-E6a-state-correction",
+  "brief": "brief.md",
+  "input": "input.json",
+  "fixture": "fixture.json",
+  "initial_state": "initial-state.json",
+  "acceptance": "acceptance.json",
+  "artifact_allowlist": [
+    "answer.json",
+    "state.json",
+    "history.json"
+  ],
+  "budgets": {
+    "timeout_ms": 3000,
+    "max_steps": 3
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "gold": {
+    "answer": "Completed."
+  },
+  "criteria": [
+    {
+      "id": "args",
+      "type": "tool_args",
+      "target": {
+        "artifact": "trace.json",
+        "field": "/calls"
+      },
+      "params": {
+        "tool": "quote",
+        "field": "",
+        "expected": {
+          "sku": "tea-42",
+          "currency": "CNY"
+        }
+      },
+      "mode": "hard",
+      "reason": "完整参数必须匹配。"
+    },
+    {
+      "id": "read-only",
+      "type": "no_write",
+      "target": {
+        "artifact": "trace.json",
+        "field": "/calls"
+      },
+      "params": {
+        "read_only_tools": [
+          "quote"
+        ]
+      },
+      "mode": "hard",
+      "reason": "不得下单或写入。"
+    },
+    {
+      "id": "trace",
+      "type": "equals",
+      "target": {
+        "artifact": "trace.json",
+        "field": ""
+      },
+      "params": {
+        "expected": {
+          "calls": [
+            {
+              "tool": "quote",
+              "arguments": {
+                "sku": "tea-42",
+                "currency": "CNY"
+              },
+              "result": {
+                "quote_id": "q-17",
+                "sku": "tea-42",
+                "currency": "CNY",
+                "unit_price_cents": 1250
+              }
+            }
+          ]
+        }
+      },
+      "mode": "hard",
+      "reason": "恰好一次查询并记录固定返回值。"
+    },
+    {
+      "id": "order",
+      "type": "equals",
+      "target": {
+        "artifact": "order.json",
+        "field": ""
+      },
+      "params": {
+        "expected": {
+          "quote_id": "q-17",
+          "quantity": 3,
+          "currency": "CNY",
+          "total_cents": 3750
+        }
+      },
+      "mode": "hard",
+      "reason": "金额与引用必须来自工具返回值。"
+    }
+  ],
+  "error_examples": [
+    {
+      "answer": "Completed.",
+      "reason": "参数拼错，其他字段保持正确以隔离检出。",
+      "expected_failed_criteria": [
+        "args",
+        "trace"
+      ],
+      "files": {
+        "trace.json": "{\"calls\": [{\"tool\": \"quote\", \"arguments\": {\"sku\": \"tea-24\", \"currency\": \"CNY\"}, \"result\": {\"quote_id\": \"q-17\", \"sku\": \"tea-42\", \"currency\": \"CNY\", \"unit_price_cents\": 1250}}]}",
+        "order.json": "{\"quote_id\": \"q-17\", \"quantity\": 3, \"currency\": \"CNY\", \"total_cents\": 3750}"
+      }
+    },
+    {
+      "answer": "Completed.",
+      "reason": "调用正确但忽略工具结果，猜测金额。",
+      "expected_failed_criteria": [
+        "order"
+      ],
+      "files": {
+        "trace.json": "{\"calls\": [{\"tool\": \"quote\", \"arguments\": {\"sku\": \"tea-42\", \"currency\": \"CNY\"}, \"result\": {\"quote_id\": \"q-17\", \"sku\": \"tea-42\", \"currency\": \"CNY\", \"unit_price_cents\": 1250}}]}",
+        "order.json": "{\"quote_id\": \"q-17\", \"quantity\": 3, \"currency\": \"CNY\", \"total_cents\": 3000}"
+      }
+    }
+  ],
+  "reviewed": false
+}
