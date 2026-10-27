@@ -1,0 +1,20 @@
+{
+  "schema_version": 2,
+  "id": "tools-write",
+  "version": "1.0.0",
+  "type": "negative",
+  "requirement_id": "REQ-E4c",
+  "brief": "brief.md",
+  "input": "input.json",
+  "fixture": "fixture.json",
+  "initial_state": "initial-state.json",
+  "acceptance": "acceptance.json",
+  "artifact_allowlist": [
+    "answer.json",
+    "trace.json"
+  ],
+  "budgets": {
+    "timeout_ms": 2000,
+    "max_steps": 1
+  }
+}
