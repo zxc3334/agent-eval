@@ -1,6 +1,6 @@
 # agent-eval · 本地冒烟、Case schema v2 与校验
 
-独立 TypeScript 评测仓库。当前只测本地确定性 **stub**，不代表 jackson-bot 的能力；真实产品以后仅经 adapter 接入。已含 E0/E1/E2、E3a schema v2、E3b brief 与 case 脚手架，本波增加 E3c schema-only 校验与 AgentInput 防泄漏测试，不接模型，不需要 API key、Docker 或 bot。
+独立 TypeScript 评测仓库。支持本地确定性 **stub** 和 **Oracle 参考解**，不代表 jackson-bot 的能力；真实产品以后仅经 adapter 接入。已含 M1、E3a/b/c、E4a/b/c，本波增加 E5a Oracle 执行路径，复用同一 verifier。不接模型，不需要 API key、Docker 或 bot。
 
 ## 安装与第一轮
 
@@ -28,6 +28,7 @@ smoke 有两个协议样例：`smoke-pass` 输出 `hello`，`smoke-fail` 输出 
 | 文件 | v2 内容 | 可见范围 |
 | --- | --- | --- |
 | `case.json` | `schema_version`、`id`、`version`、`type`（`positive`/`negative`）、文件引用、`artifact_allowlist`、`budgets`，可选 `inject`、`requirement_id`、`brief` | harness 元数据，不整体传给 agent |
+| `gold.md` + `solve.ts` | 参考解说明与独立执行代码；Oracle 按固定文件名加载 | 私有参考材料，只在 Oracle 模式执行，不传给被测 adapter |
 | `brief.md` | 目标行为、退化信号、验收标准及需求来源；由 `case.json.brief` 引用 | 私有设计材料，不传给 agent |
 | `input.json` | `prompt` | 公开任务 |
 | `fixture.json` | 本地 fixture；当前 stub 使用 `answer`、可选 `delay_ms` | 公开环境材料 |
@@ -53,7 +54,7 @@ smoke 有两个协议样例：`smoke-pass` 输出 `hello`，`smoke-fail` 输出 
 
 公开 `AgentInput` 仅含 `prompt`、`fixture`、`initial_state`、`artifact_allowlist`、`budgets`。loader 逐字段构造并序列化到 `workspace/input.json`，不将 case、验收或实验对象整体展开。fixture 与初始状态的内容均视为公开，编写时不能放 Gold 或私有答案；stub 的 fixture.answer 是用于演示的确定性响应，验收真值独立保存在 acceptance 中。
 
-私有 `acceptance.json` 的 Gold、criteria、错误对照和 reviewed 不复制到工作目录，也不属于 AgentInput。`reviewed: false` 表示尚未经人工确认，不阻止本地迭代；现有样例均为 false。`type` 表达用例类别，negative 不反转判分，仍由 criteria 判断。Gold 和错误对照在 E3a 仅存储和校验结构，尚不执行 Oracle/校准。
+私有 `acceptance.json` 的 Gold、criteria、错误对照和 reviewed 不复制到工作目录，也不属于 AgentInput。`reviewed: false` 表示尚未经人工确认，不阻止本地迭代；现有样例均为 false。`type` 表达用例类别，negative 不反转判分，仍由 criteria 判断。旧 `acceptance.gold.answer` 保留结构兼容，但不作为 Oracle 输出来源或判分依据。E5a 执行独立 `solve.ts`，不做错误对照校准或 E5b reviewed 门禁。
 
 suite 必须引用精确 case 版本，拒绝范围、latest、缺版本和重复 id：
 
@@ -77,7 +78,7 @@ suite 必须引用精确 case 版本，拒绝范围、latest、缺版本和重�
 {"adapter": "stub", "model": null, "product": {}}
 ```
 
-可用 `pnpm eval --experiment <本地JSON路径>` 切换；`--agent stub` 必须与实验 adapter 一致。实验配置只进入 run 的 `config.json`，不进入 AgentInput；当前只执行 stub，model/product 是记录用元数据，不调用模型或产品。失败重跑继承实验文件路径并重新读取，可显式覆盖；watch 也监听该文件。
+可用 `pnpm eval --experiment <本地JSON路径>` 切换；`--agent stub|oracle` 必须与实验 adapter 一致。`--agent oracle` 默认选择 `experiments/oracle.json`。实验配置只进入 run 的 `config.json`，不进入 AgentInput；model/product 是记录用元数据，不调用模型或产品。失败重跑继承实验文件路径并重新读取，可显式覆盖；watch 也监听该文件。
 
 ## 看失败与证据
 
@@ -291,7 +292,7 @@ pnpm eval --suite tools --case tools-pass --agent stub  # 退出 0
 
 ## 本波边界
 
-E4c 在已有 E4a/E4b 上增加工具参数、禁写和重复副作用断言，沿用 E3c schema-only 校验和 AgentInput 隔离。借鉴 Harbor 的独立 verifier/产物分离与 Workbench 的需求→case→证据，不采用二者 runtime。不实现 E5 Oracle、E6 seeds、真实 adapter、跨 run baseline 对比、公共榜、云并行、线上 QQ 或模型调用。
+E4c 在已有 E4a/E4b 上增加工具参数、禁写和重复副作用断言，沿用 E3c schema-only 校验和 AgentInput 隔离。借鉴 Harbor 的独立 verifier/产物分离与 Workbench 的需求→case→证据，不采用二者 runtime。E4c 阶段未实现 Oracle；E5a 的执行路径见下节。仍不实现 E5b reviewed 门禁、E6 seeds、真实 adapter、跨 run baseline 对比、公共榜、云并行、线上 QQ 或模型调用。
 
 本机验收是 macOS arm64；Linux 使用相同 POSIX 机制但尚未实机验证，Windows 不支持本波进程组清理。不可捕获的 SIGKILL/断电不保证最后一份报告已写完；已写入的证据保留。stub 进程隔离用于生命周期管理，不是执行不可信代码的安全沙箱。
 
@@ -309,3 +310,39 @@ E4c 在已有 E4a/E4b 上增加工具参数、禁写和重复副作用断言，�
 
 - E4b：https://app.notion.com/p/405e1347ee9781a0b537f7e698d07323
 - E4c：https://app.notion.com/p/405e1347ee978167b1a8ebc1fc601055
+
+
+## E5a：从固定初态执行 Oracle，再由同一 verifier 判定
+
+```sh
+pnpm eval --suite smoke --agent oracle   # 2 pass，exit 0
+pnpm eval --suite fields --agent oracle  # 5 pass，wording-hint 诊断失败仍可见，exit 0
+pnpm eval --suite tools --agent oracle   # 6 pass，exit 0
+pnpm eval --suite smoke --agent stub     # 保留 1 pass + 1 fail，exit 1
+pnpm typecheck
+pnpm test
+```
+
+现有 18 个 case（含 faults）均提供 `gold.md` 与 `solve.ts`。负例的 stub fixture 用于暴露错误，Oracle 则生成满足任务要求的参考产物；Oracle 通过不等于被测 agent 通过。`case new` 同样生成两个文件，参考解默认输出与验收期望不同的占位值，先呈现失败，作者独立编辑后再验证。旧 v2 case 可继续运行 stub；选择 Oracle 时缺少或空白参考文件会在启动 run 前报错，退出码 2。`validate --schema-only` 仍只做结构校验，不执行参考解、不要求历史 case 补 Gold。
+
+执行链为：加载并快照固定初态与参考源码 → 在全新 workspace 写入 OracleInput → 子进程执行 solve.ts → 收集白名单产物 → 校验 answer.json 协议 → 调用 `src/verifier.ts::verify`。最后一段是 stub 与 Oracle 共用的 runner 分支，未增加第二套评分逻辑。`success: true`、Gold 文档及 `acceptance.gold.answer` 均不能直接产生 pass；只由 hard 断言决定 pass/fail，diagnostic 继续报告而不阻断。
+
+OracleInput 仅有 `prompt`、`initial_state`、`artifact_allowlist`、`budgets`，不含 stub fixture、acceptance 或 verifier 配置。solve.ts 应为自包含、使用 Node 内置模块的脚本，从当前目录的 input.json 读取初态，并写 answer.json（必须有 answer 字段）及所需文件。参考解不得导入 verifier 的业务实现或反读 criteria 生成答案。fields 的参考解直接克隆初态并改 theme，verifier 独立检查字段与基线；tools 的参考解记录一次 search 动作，verifier 独立检查参数、禁写和重复副作用。
+
+每例运行目录分别保存：
+
+| 路径 | 内容 |
+| --- | --- |
+| `oracle/` | 本次执行的 gold.md、solve.ts、input.json 快照，仅 Oracle 有此目录 |
+| `workspace/` | 新建执行目录、公开任务和固定初态、参考解生成的工作文件 |
+| `artifacts/` | allowlist 中的普通文件及 stdout/stderr 日志；不接受符号链接产物 |
+| `verifier/attempt-*/` | 与普通执行一致的输入 criteria、断言输出和判定 |
+| `snapshot.json`、`result.json`、`events.jsonl` | case 快照、最终结果与过程记录 |
+
+参考进程使用 Node 权限限制，只能读取自身源码与 workspace、写入 workspace；不能读取原 case/acceptance/verifier 源码或覆盖 verifier 结果。该边界用于避免意外耦合，不是对恶意程序的 OS 安全沙箱；本波不引入容器、Harbor/Workbench runtime、真实工具调用或网络模型。
+
+超时预算和取消复用已有进程清理路径，参考解是一次进程调用（max_steps 仍沿用现有 one-step 协议）。崩溃或无效 answer 协议为 agent_error，超时为 timeout，verifier 错误保持 verifier_error，均退出 2。faults 中 agent_error/protocol_error/timeout 是 stub 专属注入，Oracle 执行自己的参考解，因此这三例通过；environment_error 与 verifier_error 注入仍生效，Oracle faults 预期 3 pass + 2 error、exit 2。准备阶段失败时尚未执行参考解，不会产生 oracle/ 快照。
+
+支持 `--case`、`--fail-fast`、`--watch` 和 `--failed-from`。watch 会监听参考文件；failed-from 默认继承源 run 的 executor/experiment，读取当前 case 与参考解，再从固定初态重跑；可显式切换 `--agent`。报告可在源 case 不存在时从 run 产物离线重建。
+
+本票不实现 E5b reviewed 门禁、E6 seeds、Gold 错误对照校准或真实 jackson-bot adapter；所有已有 reviewed 值保持不变。

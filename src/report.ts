@@ -25,7 +25,7 @@ export function generateReport(dir: string) {
   };
   json(join(dir, 'summary.json'), summary);
   const pct = (v: number | null) => v === null ? 'N/A' : `${(v * 100).toFixed(1)}%`;
-  const lines = [`# Run ${config.run_id}`, '', `Agent: ${config.agent} (local stub; not jackson-bot)`, `Configuration: ${config.config_source}`, `Source run: ${config.source_run_id ?? 'none'}`, '',
+  const lines = [`# Run ${config.run_id}`, '', `Agent: ${config.agent} (${config.agent === 'oracle' ? 'local reference solution' : 'local stub'}; not jackson-bot)`, `Configuration: ${config.config_source}`, `Source run: ${config.source_run_id ?? 'none'}`, '',
     `Attempted: ${attempted}/${config.case_ids.length}; scored: ${scored}`, `All-attempt pass rate: ${pct(summary.pass_rate)} (pass / attempted)`, `Scoring coverage: ${pct(summary.scoring_coverage)} ((pass + fail) / attempted)`,
     `Counts: ${JSON.stringify(counts)}`, `Not attempted: ${notAttempted.join(', ') || 'none'}`, `Interrupted: ${summary.interrupted}; exit code: ${code}`, ''];
   if (state.error) lines.push(`Run error: ${state.error}`, '');
