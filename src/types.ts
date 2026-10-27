@@ -9,7 +9,13 @@ export type Criterion = CriterionBase & (
   | { type: 'equals'; params: { expected: unknown } }
   | { type: 'json_parseable'; params: Record<string, never> }
   | { type: 'fields_preserved'; params: { baseline: unknown; fields: string[] } }
+  | { type: 'tool_args'; params: { tool: string; field: string; expected: unknown } }
+  | { type: 'no_write'; params: { read_only_tools: string[] } }
+  | { type: 'no_duplicate_side_effects'; params: { side_effect_tools: string[] } }
 );
+export type ToolCriterion = Extract<Criterion, { type: 'tool_args' | 'no_write' | 'no_duplicate_side_effects' }>;
+// One entry per attempted invocation; outcome/id metadata does not erase an attempt.
+export interface ToolCall { tool: string; arguments: Record<string, unknown> }
 export type VerifierFault = 'verifier_error' | 'verifier_timeout' | 'verifier_missing' | 'verifier_invalid';
 export interface Budgets { timeout_ms: number; max_steps: number }
 export interface Fixture { answer: unknown; delay_ms?: number; files?: Record<string, string> }

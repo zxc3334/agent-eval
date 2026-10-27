@@ -241,9 +241,57 @@ verifier 在原有独立 worker 中只读 artifacts，同次验证缓存 JSON �
 
 硬断言失败决定 fail；diagnostic 失败只提供反馈。缺失或不可解析的被验收产物是断言 fail；worker 异常、超时、缺结果、无效结果仍是 `verifier_error`。原有 adapter 的 `answer.json` 响应协议仍先检查，缺失或破坏响应信封仍归 `agent_error`（protocol 阶段）。JSON 之外的格式、glob/目录、通用 JSON Schema、自动枚举所有无关字段不在 E4b 范围。
 
+## E4c：工具参数与副作用断言
+
+```sh
+pnpm eval validate --schema-only --suite tools  # 6 cases，退出 0
+pnpm eval --suite tools --agent stub           # 2 pass + 4 fail，预期退出 1
+pnpm eval --suite tools --case tools-pass --agent stub  # 退出 0
+```
+
+工具调用记录放在 allowlist 内的 JSON 产物中。`target.field` 选择调用数组，可以是文档根 `""` 或 `/calls` 等 E4b JSON Pointer。每条记录必须含非空 `tool` 和对象类型的 `arguments`，额外的 `id`、`success` 等元数据可保留，但不参与判分。例如 `trace.json`：
+
+```json
+{
+  "calls": [
+    { "tool": "search", "arguments": { "query": "alpha", "limit": 5 } },
+    { "tool": "get", "arguments": { "id": "item-1" } }
+  ]
+}
+```
+
+三种新类型沿用完整 Criterion 和 `hard | diagnostic`：
+
+| type | params 示例 | 判断 |
+| --- | --- | --- |
+| `tool_args` | `{ "tool": "search", "field": "/query", "expected": "alpha" }` | 至少有一次该工具调用，且每次调用参数中的指定字段都存在并严格深相等 |
+| `no_write` | `{ "read_only_tools": ["search", "get"] }` | 所有调用都属于作者声明的只读工具；未列出的工具一律失败 |
+| `no_duplicate_side_effects` | `{ "side_effect_tools": ["send", "write"] }` | 指定副作用工具不能出现相同工具名、深相等参数的重复调用 |
+
+例如参数检查：
+
+```json
+{
+  "id": "query", "type": "tool_args",
+  "target": { "artifact": "trace.json", "field": "/calls" },
+  "params": { "tool": "search", "field": "/query", "expected": "alpha" },
+  "mode": "hard", "reason": "Every search must use the requested query."
+}
+```
+
+`params.field` 相对于 `arguments` 选择字段，空串检查整个参数对象；可用多个 criterion 检查多个字段。指定字段之外的参数允许变化，整个对象比较则禁止额外参数。工具名精确、区分大小写；不通过名称猜测写操作，也不相信调用记录的 `read_only` 声明。列表必须唯一、元素非空；`read_only_tools: []` 表示禁止任何调用，`side_effect_tools` 不得为空。
+
+重复检查只针对指定副作用工具，同名只读调用可以重复。对象键顺序不影响相等，参数类型、数组顺序和工具名影响相等；调用 ID、时间、成功/失败标记不影响相等。每条记录视作一次尝试，因此重试同样计数，不推测失败调用是否已产生外部效果。合法空数组通过禁写和重复检查，参数检查失败；缺产物、缺字段、非法 JSON、非数组或任意非法调用记录均产生断言失败，不能当空数组跳过。
+
+工具断言继续使用 E4a 的 `expected / actual / passed / evidence`，证据指向原始产物与调用数组。`tool_args.expected` 是要求的字段值，`actual` 是每次匹配调用的 `{index, found, value}`；禁写/重复检查的 `expected` 是空违规列表，`actual` 列出违规调用（零基 `index`、工具名、参数），重复项还带 `first_index`。`problem` 给出失败原因，终端、报告与独立 `verifier/attempt-*` 目录均可查看。worker 异常、超时、缺失或无效结果仍为 `verifier_error`。
+
+`tools-pass` 演示参数、禁写、重复检查与 E4b 字段保留共同通过；`tools-diagnostic` 演示参数诊断失败不影响 hard 判定。另四例分别演示参数错误、禁止写调用、重复副作用、非法调用记录。`tools-duplicate` 将禁写设为 diagnostic，单独展示重复副作用 hard gate。所有记录都通过原有 `fixture.files` 静态重放，stub 不执行这些工具。
+
+此检查基于提供的调用记录，不证明记录完整或外部系统未变化。case 作者负责正确声明工具策略；没有纳入 `side_effect_tools` 的工具不参与重复检查。语义相同但参数不同、不同工具别名、跨 run 去重和真实副作用捕获不在 E4c 范围。
+
 ## 本波边界
 
-E4b 在已有 E4a Criterion 协议上增加结构化字段与 JSON 文件断言，沿用 E3c schema-only 校验和 AgentInput 隔离。借鉴 Harbor 的独立 verifier/产物分离与 Workbench 的需求→case→证据，不采用二者 runtime。不实现 E4c 工具参数/副作用、E5 Oracle、E6 seeds、真实 adapter、跨 run baseline 对比、公共榜、云并行、线上 QQ 或模型调用。
+E4c 在已有 E4a/E4b 上增加工具参数、禁写和重复副作用断言，沿用 E3c schema-only 校验和 AgentInput 隔离。借鉴 Harbor 的独立 verifier/产物分离与 Workbench 的需求→case→证据，不采用二者 runtime。不实现 E5 Oracle、E6 seeds、真实 adapter、跨 run baseline 对比、公共榜、云并行、线上 QQ 或模型调用。
 
 本机验收是 macOS arm64；Linux 使用相同 POSIX 机制但尚未实机验证，Windows 不支持本波进程组清理。不可捕获的 SIGKILL/断电不保证最后一份报告已写完；已写入的证据保留。stub 进程隔离用于生命周期管理，不是执行不可信代码的安全沙箱。
 
@@ -260,3 +308,4 @@ E4b 在已有 E4a Criterion 协议上增加结构化字段与 JSON 文件断言�
 - E3c：https://app.notion.com/p/405e1347ee97817c90f8f782dbfd8902
 
 - E4b：https://app.notion.com/p/405e1347ee9781a0b537f7e698d07323
+- E4c：https://app.notion.com/p/405e1347ee978167b1a8ebc1fc601055

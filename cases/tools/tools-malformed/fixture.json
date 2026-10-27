@@ -1,0 +1,6 @@
+{
+  "answer": "Completed successfully.",
+  "files": {
+    "trace.json": "{\"calls\": [{\"tool\": \"search\", \"arguments\": {\"query\": \"alpha\"}}, {\"tool\": \"write\"}], \"owner\": \"Ada\"}"
+  }
+}

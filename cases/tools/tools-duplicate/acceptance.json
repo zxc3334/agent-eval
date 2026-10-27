@@ -1,0 +1,79 @@
+{
+  "gold": {
+    "answer": "Read-only search for alpha; no duplicate side effects."
+  },
+  "criteria": [
+    {
+      "id": "args",
+      "type": "tool_args",
+      "target": {
+        "artifact": "trace.json",
+        "field": "/calls"
+      },
+      "params": {
+        "tool": "search",
+        "field": "/query",
+        "expected": "alpha"
+      },
+      "mode": "hard",
+      "reason": "Every search must use the required query; at least one search is required."
+    },
+    {
+      "id": "read-only",
+      "type": "no_write",
+      "target": {
+        "artifact": "trace.json",
+        "field": "/calls"
+      },
+      "params": {
+        "read_only_tools": [
+          "search",
+          "get"
+        ]
+      },
+      "mode": "diagnostic",
+      "reason": "Only declared read-only tools are allowed."
+    },
+    {
+      "id": "once",
+      "type": "no_duplicate_side_effects",
+      "target": {
+        "artifact": "trace.json",
+        "field": "/calls"
+      },
+      "params": {
+        "side_effect_tools": [
+          "send",
+          "write"
+        ]
+      },
+      "mode": "hard",
+      "reason": "The same side-effect tool and arguments may only be attempted once."
+    },
+    {
+      "id": "owner",
+      "type": "fields_preserved",
+      "target": {
+        "artifact": "trace.json",
+        "field": ""
+      },
+      "params": {
+        "baseline": {
+          "owner": "Ada"
+        },
+        "fields": [
+          "/owner"
+        ]
+      },
+      "mode": "hard",
+      "reason": "Preserve the unrelated owner field."
+    }
+  ],
+  "error_examples": [
+    {
+      "answer": "Completed successfully.",
+      "reason": "Self-reported success cannot substitute for a valid trace and matching calls."
+    }
+  ],
+  "reviewed": false
+}

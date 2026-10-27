@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { assertJsonValue, criterionExpected } from './criteria.ts';
 import { projectFields, selectField } from './json-fields.ts';
+import { evaluateToolCalls } from './tool-verifier.ts';
 import type { Criterion } from './types.ts';
 
 type Document = { ok: true; value: unknown } | { ok: false; problem: string };
@@ -44,6 +45,9 @@ export function evaluateFiles(criteria: Criterion[], artifacts: string) {
     }
     const selected = selectField(document.value, c.target.field);
     if (!selected.found) return { ...row, problem: `missing field: ${JSON.stringify(c.target.field)}` };
+    if (c.type === 'tool_args' || c.type === 'no_write' || c.type === 'no_duplicate_side_effects') {
+      return { ...row, ...evaluateToolCalls(c, selected.value) };
+    }
     return { ...row, actual: selected.value, passed: isDeepStrictEqual(row.expected, selected.value) };
   });
 }

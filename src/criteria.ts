@@ -25,6 +25,7 @@ export function assertJsonValue(value: unknown, field: string, ancestors = new S
 export function criterionExpected(c: Criterion): unknown {
   if (c.type === 'json_parseable') return true;
   if (c.type === 'fields_preserved') return projectFields(c.params.baseline, c.params.fields);
+  if (c.type === 'no_write' || c.type === 'no_duplicate_side_effects') return [];
   return c.params.expected;
 }
 
@@ -38,7 +39,7 @@ export function normalizeCriteria(value: unknown, source: string): Criterion[] {
     const field = `criteria[${i}]`;
     if (!record(input) || typeof input.id !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(input.id) || seen.has(input.id)) return bad(field, 'requires unique id using letters, digits, _ or -');
     seen.add(input.id);
-    if (typeof input.type !== 'string' || !['equals', 'json_parseable', 'fields_preserved'].includes(input.type)) return bad(`${field}.type`, 'expected equals, json_parseable or fields_preserved');
+    if (typeof input.type !== 'string' || !['equals', 'json_parseable', 'fields_preserved', 'tool_args', 'no_write', 'no_duplicate_side_effects'].includes(input.type)) return bad(`${field}.type`, 'expected equals, json_parseable, fields_preserved, tool_args, no_write or no_duplicate_side_effects');
     const legacy = input.type === 'equals' && !['target', 'params', 'mode', 'reason'].some(key => Object.hasOwn(input, key));
     if (legacy && !Object.hasOwn(input, 'expected')) return bad(`${field}.expected`, 'required');
     const raw = legacy ? { id: input.id, type: 'equals', target: { artifact: 'answer.json', field: 'answer' },
@@ -56,6 +57,26 @@ export function normalizeCriteria(value: unknown, source: string): Criterion[] {
     if (raw.type === 'equals') {
       if (!Object.hasOwn(raw.params, 'expected') || Object.keys(raw.params).length !== 1) return bad(`${field}.params`, 'requires only expected');
       return { ...base, type: 'equals', params: { expected: raw.params.expected } };
+    }
+    if (raw.type === 'tool_args') {
+      const { tool, field: argumentField, expected } = raw.params;
+      if (typeof tool !== 'string' || !tool.trim() || !validField(argumentField)
+        || !Object.hasOwn(raw.params, 'expected') || Object.keys(raw.params).length !== 3) {
+        return bad(`${field}.params`, 'tool_args requires nonempty tool, field (JSON Pointer or top-level name), and expected');
+      }
+      return { ...base, type: 'tool_args', params: { tool, field: argumentField, expected } };
+    }
+    if (raw.type === 'no_write' || raw.type === 'no_duplicate_side_effects') {
+      const key = raw.type === 'no_write' ? 'read_only_tools' : 'side_effect_tools';
+      const names = raw.params[key];
+      if (Object.keys(raw.params).length !== 1 || !Array.isArray(names)
+        || names.some(name => typeof name !== 'string' || !name.trim()) || new Set(names).size !== names.length
+        || (raw.type === 'no_duplicate_side_effects' && !names.length)) {
+        return bad(`${field}.params`, `${raw.type} requires only ${key}, a unique array of nonempty tool names${raw.type === 'no_duplicate_side_effects' ? ' (nonempty)' : ''}`);
+      }
+      return raw.type === 'no_write'
+        ? { ...base, type: 'no_write', params: { read_only_tools: names } }
+        : { ...base, type: 'no_duplicate_side_effects', params: { side_effect_tools: names } };
     }
     if (raw.target.field !== '') return bad(`${field}.target.field`, 'file assertions require the document root (empty string)');
     if (raw.type === 'json_parseable') {
