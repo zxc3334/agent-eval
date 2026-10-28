@@ -74,6 +74,13 @@ export function loadCase(casesDir: string, suite: string, ref: CaseRef): LoadedC
   if (raw?.schema_version !== 2) bad('schema_version', 'expected 2; migrate v1 case');
   if (raw.id !== ref.id) bad('id', `expected ${ref.id}`);
   if (raw.requirement_id !== undefined) identifier(raw.requirement_id, `${file}: requirement_id`);
+  if (raw.source_evidence !== undefined) {
+    if (!object(raw.source_evidence)) bad('source_evidence', 'expected source run, case and result');
+    identifier(raw.source_evidence.run_id, `${file}: source_evidence.run_id`);
+    identifier(raw.source_evidence.case_id, `${file}: source_evidence.case_id`);
+    if (!raw.requirement_id) bad('requirement_id', 'required for feedback case');
+    localFile(dirname(file), raw.source_evidence.result, 'source_evidence.result');
+  }
   const briefFile = raw.brief === undefined ? undefined : localFile(dirname(file), raw.brief, 'brief');
   if (briefFile && !readFileSync(briefFile, 'utf8').trim()) bad('brief', 'expected nonempty document');
   exactVersion(ref.version, `${file}: suite version`);

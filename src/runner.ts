@@ -1,12 +1,12 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { loadCase, loadExperiment, suiteCases } from './config.ts';
+import { caseFile, loadCase, loadExperiment, suiteCases } from './config.ts';
 import { json } from './storage.ts';
 import { generateReport, LOCAL_EVALUATION_NOTICE } from './report.ts';
 import { loadGold } from './oracle.ts';
 import { evaluate } from './evaluation.ts';
-import { requireReviewedSuite } from './review.ts';
+import { requireFeedbackReview, requireReviewedSuite } from './review.ts';
 import { preflightJacksonBotPi } from './jackson-bot-pi.ts';
 import { createManifest, compareManifest, compareSourceFiles, compareUsedImages, writeManifest } from './manifest.ts';
 import { readJson } from './config.ts';
@@ -27,6 +27,11 @@ export async function run(options: Options, signal: AbortSignal = new AbortContr
   const ids = options.selectedIds ?? (options.caseId ? [options.caseId] : all);
   if (ids.some(id => !all.includes(id))) throw new Error(`case: ${ids.filter(id => !all.includes(id)).join(', ')} not in suite ${options.suite}`);
   const cases = ids.map(id => loadCase(options.casesDir, options.suite, refs.find(ref => ref.id === id)!));
+  cases.forEach(requireFeedbackReview);
+  const requirement_catalog = refs.map(ref => {
+    try { const meta = readJson(caseFile(options.casesDir, options.suite, ref)); return { case_id: ref.id, requirement_id: typeof meta.requirement_id === 'string' ? meta.requirement_id : null }; }
+    catch { return { case_id: ref.id, requirement_id: null }; }
+  });
   const experiment = loadExperiment(options.experimentFile);
   if (options.agent !== experiment.adapter) throw new Error(`agent: ${options.agent} does not match experiment adapter ${experiment.adapter}`);
   const manifest = createManifest(options, cases, experiment);
@@ -45,7 +50,7 @@ export async function run(options: Options, signal: AbortSignal = new AbortContr
   const dir = join(options.runsDir, runId); mkdirSync(dir, { recursive: true });
   const configSource = `${options.casesDir} (current files; suite=${options.suite})`;
   const repeat = options.repeat ?? 1;
-  json(join(dir, 'config.json'), { run_id: runId, agent: options.agent, experiment, experiment_file: options.experimentFile, suite: options.suite, cases_dir: options.casesDir, case_ids: ids, case_refs: ids.map(id => refs.find(ref => ref.id === id)!), config_source: configSource, source_run_id: options.sourceRunId ?? null, fail_fast: options.failFast, repeat, cases });
+  json(join(dir, 'config.json'), { run_id: runId, agent: options.agent, experiment, experiment_file: options.experimentFile, suite: options.suite, cases_dir: options.casesDir, case_ids: ids, case_refs: ids.map(id => refs.find(ref => ref.id === id)!), config_source: configSource, source_run_id: options.sourceRunId ?? null, fail_fast: options.failFast, repeat, cases, requirement_catalog });
   if (options.agent !== 'jackson-bot-pi') console.log(LOCAL_EVALUATION_NOTICE);
   console.log(options.agent === 'container' ? 'Isolation: Docker agent + fresh verifier; local scripted fixture, not a product adapter.' : 'Isolation: trusted-local; no Docker and no security sandbox.');
   console.log(`Run ${runId}\nRun directory: ${dir}\nConfiguration source: ${configSource}\nSource run: ${options.sourceRunId ?? 'none'}`);

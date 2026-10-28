@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { loadCase, localFile, readJson } from './config.ts';
-import type { CaseRef } from './types.ts';
+import type { CaseRef, LoadedCase } from './types.ts';
 
 export const RECEIPT = '.calibration.json';
 
@@ -22,6 +22,7 @@ export function contentHash(caseFile: string): string {
     } else add(field, readFileSync(file, 'utf8'));
   }
   for (const name of ['gold.md', 'solve.ts']) add(name, readFileSync(localFile(dir, name, `oracle.${name}`), 'utf8'));
+  if (config.source_evidence) add('source_evidence', readFileSync(localFile(dir, config.source_evidence.result, 'source_evidence.result'), 'utf8'));
   for (const name of ['artifact-freeze', 'trial', 'container', 'review', 'calibration', 'evaluation', 'oracle', 'process', 'config', 'criteria', 'verifier', 'verifier-worker', 'file-verifier', 'tool-verifier', 'json-fields']) {
     add(`engine/${name}`, readFileSync(new URL(`./${name}.ts`, import.meta.url), 'utf8'));
   }
@@ -30,6 +31,17 @@ export function contentHash(caseFile: string): string {
     for (const source of [...Object.values(config.execution.public_files), config.execution.private_tests]) add(String(source), readFileSync(localFile(dir, source, 'execution'), 'utf8'));
   }
   return `sha256:${hash.digest('hex')}`;
+}
+
+export function requireFeedbackReview(c: LoadedCase): void {
+  if (!c.config.source_evidence || !c.acceptance.reviewed) return;
+  const fail = (): never => { throw new Error(`${c.file}: reviewed gate: independent Oracle and every error control require a passing current calibration receipt; run validate before setting reviewed=true`); };
+  let receipt: any;
+  try { receipt = readJson(localFile(dirname(c.file), RECEIPT, 'calibration')); }
+  catch { return fail(); }
+  if (receipt?.schema_version !== 1 || receipt?.status !== 'passed' || receipt?.oracle_passed !== true
+    || !c.acceptance.error_examples.length || receipt.controls_rejected !== c.acceptance.error_examples.length
+    || receipt.content_hash !== contentHash(c.file)) fail();
 }
 
 // Local suites remain useful for drafts and fault injection. Formal suites check
