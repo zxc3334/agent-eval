@@ -15,16 +15,18 @@ import type { GoldSource } from './oracle.ts';
 import type { DockerCommand } from './container.ts';
 import type { ErrorExample, LoadedCase, Result, ExperimentConfig } from './types.ts';
 
-export async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal, gold?: GoldSource, counterexample?: ErrorExample, executionMode = 'stub', docker: DockerCommand = dockerCommand, experiment?: ExperimentConfig): Promise<Result> {
-  const start = performance.now(); const caseDir = join(dir, 'cases', c.config.id);
+export async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal, gold?: GoldSource, counterexample?: ErrorExample, executionMode = 'stub', docker: DockerCommand = dockerCommand, experiment?: ExperimentConfig, trial?: number): Promise<Result> {
+  const start = performance.now(); const caseDir = trial === undefined ? join(dir, 'cases', c.config.id) : join(dir, 'cases', c.config.id, 'trials', String(trial));
   const workspace = join(caseDir, 'workspace'); const artifacts = join(caseDir, 'artifacts');
   mkdirSync(caseDir, { recursive: true });
   mkdirSync(workspace); mkdirSync(artifacts); // Exclusive creation: never inherit a previous trial.
   const events = join(caseDir, 'events.jsonl');
   const event = (type: string, data: unknown) => appendFileSync(events, JSON.stringify({ time: new Date().toISOString(), type, data }) + '\n');
   for (const name of ['stdout.log', 'stderr.log']) writeFileSync(join(artifacts, name), '');
-  const result: Result = { case_id: c.config.id, status: 'environment_error', assertions: [], duration_ms: 0, events };
+  const result: Result = { case_id: c.config.id, status: 'environment_error', assertions: [], duration_ms: 0, events, steps_used: null, ...(trial === undefined ? {} : { trial }) };
   let stage = 'prepare'; let temp: string | undefined;
+  const progress = () => console.log(`Progress: case=${c.config.id}${trial === undefined ? '' : ` trial=${trial}`} phase=${stage} elapsed=${Math.round(performance.now() - start)}ms steps=${result.steps_used ?? 'unknown'}/${c.input.budgets.max_steps}`);
+  progress(); const progressTimer = setInterval(progress, 1000);
   const executor = counterexample ? 'counterexample' : gold ? 'oracle' : executionMode;
   event('case_start', { case_id: c.config.id });
   try {
@@ -44,9 +46,11 @@ export async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal, 
       stagePublicFiles(c, workspace);
     }
     stage = 'agent'; event('agent_start', { agent: executor, ...c.input.budgets });
+    if (executor === 'stub' || executor === 'oracle' || executor === 'counterexample') result.steps_used = 1;
+    progress();
     if (executor === 'jackson-bot-pi' && (!experiment || experiment.adapter !== 'jackson-bot-pi')) throw new Error('jackson-bot-pi: missing matching experiment');
     result.agent_started = true;
-    const outcome: { code: number | null; timedOut: boolean; error?: string } = executor === 'container'
+    const outcome: { code: number | null; timedOut: boolean; error?: string; stepsUsed?: number; stopReason?: string; usage?: Result['usage'] } = executor === 'container'
       ? await runContainer({ role: 'agent', image: image!, workspace, argv: c.config.execution!.command,
         epoch: session.epoch_ms, timeout: c.input.budgets.timeout_ms, logDir: artifacts, signal }, docker)
       : counterexample
@@ -54,8 +58,11 @@ export async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal, 
       : gold
       ? await invokeOracle(gold, input, caseDir, workspace, artifacts, temp, signal)
       : executor === 'jackson-bot-pi'
-      ? await invokeJacksonBotPi({ experiment: experiment!, input: c.input, workspace, artifacts, temp, session, signal })
+      ? await invokeJacksonBotPi({ experiment: experiment!, input: c.input, workspace, artifacts, temp, session, signal, onSteps: steps => { result.steps_used = steps; } })
       : await invokeStub(workspace, artifacts, temp, c.input.budgets.timeout_ms, c.config.inject, signal);
+    if (outcome.stepsUsed !== undefined) result.steps_used = outcome.stepsUsed;
+    if (outcome.usage) result.usage = outcome.usage;
+    if (outcome.stopReason) result.stop_reason = outcome.stopReason;
     event('agent_stopped', { agent: executor, outcome });
     stage = 'artifact_handoff';
     const frozen = join(caseDir, 'frozen');
@@ -69,6 +76,7 @@ export async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal, 
     stage = 'agent';
     if (signal.aborted) { result.status = 'environment_error'; throw new Error('interrupted by signal'); }
     if (outcome.timedOut) { result.status = 'timeout'; throw new Error(`budget exceeded (${c.input.budgets.timeout_ms}ms)`); }
+    if (outcome.stopReason) { result.status = 'agent_error'; throw new Error(outcome.stopReason); }
     if (outcome.error) { result.status = 'environment_error'; throw new Error(outcome.error); }
     result.status = 'agent_error';
     if (outcome.code !== 0) throw new Error(`${executor} exited with code ${outcome.code}; see artifacts/stderr.log`);
@@ -79,7 +87,7 @@ export async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal, 
     stage = 'protocol';
     const response = readJson(join(artifacts, 'answer.json'));
     if (!response || !Object.hasOwn(response, 'answer')) throw new Error('answer.json: answer: required');
-    stage = 'verifier'; result.status = 'verifier_error';
+    stage = 'verifier'; result.status = 'verifier_error'; progress();
     const verification = await verify(normalizeCriteria(c.acceptance.criteria, c.file), artifacts, caseDir, c.config.inject, signal);
     result.verifier_result_dir = verification.result_dir;
     result.assertions = verification.assertions;
@@ -104,6 +112,7 @@ export async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal, 
     result.stage = stage; result.reason = (error as Error).message;
     event('error', { stage, reason: result.reason });
   } finally {
+    clearInterval(progressTimer);
     if (temp) rmSync(temp, { recursive: true, force: true });
   }
   result.duration_ms = Math.round(performance.now() - start);

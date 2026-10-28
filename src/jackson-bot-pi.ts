@@ -3,6 +3,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmS
 import { tmpdir } from 'node:os';
 import { isAbsolute, relative, resolve, join } from 'node:path';
 import { json } from './storage.ts';
+import { StringDecoder } from 'node:string_decoder';
 import { outputName } from './artifact-freeze.ts';
 import type { AgentInput, ExperimentConfig } from './types.ts';
 
@@ -62,21 +63,24 @@ export async function preflightJacksonBotPi(experiment: ExperimentConfig): Promi
   } finally { rmSync(temp, { recursive: true, force: true }); }
 }
 
-type Outcome = { code: number | null; timedOut: boolean; error?: string };
+type Outcome = { code: number | null; timedOut: boolean; error?: string; stepsUsed?: number; stopReason?: string; usage?: { input_tokens?: number; output_tokens?: number; cost?: number } };
 export async function invokeJacksonBotPi(args: {
   experiment: ExperimentConfig; input: AgentInput; workspace: string; artifacts: string; temp: string;
-  session: { id: string }; signal: AbortSignal;
+  session: { id: string }; signal: AbortSignal; onSteps?: (steps: number) => void;
 }): Promise<Outcome> {
   const { experiment, input, workspace, artifacts, temp, session, signal } = args;
   const { entry } = product(experiment);
   const storage = join(temp, 'product-storage'); mkdirSync(storage);
   const request = { protocol_version: 1, session_id: session.id, model: experiment.model, prompt: input.prompt,
+    ...(experiment.product.sampling === undefined ? {} : { sampling: experiment.product.sampling }),
     fixture: input.fixture, initial_state: input.initial_state, artifact_allowlist: input.artifact_allowlist,
     budgets: input.budgets, storage_dir: storage, mock_tools: true };
   json(join(artifacts, 'product-request.json'), request);
   const eventFile = join(artifacts, 'product-events.jsonl'); writeFileSync(eventFile, '');
   const outcome = await new Promise<Outcome>(done => {
     let timedOut = false; let error: string | undefined; let stopping = false; let bytes = 0;
+    let stepsUsed = 0; let stopReason: string | undefined; let usage: Outcome['usage'];
+    let pending = ''; const decoder = new StringDecoder('utf8'); args.onSteps?.(0);
     const child = spawn(process.execPath, [entry], { cwd: temp, detached: true, stdio: ['pipe', 'pipe', 'pipe'],
       env: { PATH: process.env.PATH ?? '', HOME: temp, TMPDIR: temp, NODE_NO_WARNINGS: '1' } });
     let escalation: NodeJS.Timeout | undefined;
@@ -84,15 +88,38 @@ export async function invokeJacksonBotPi(args: {
     const stop = () => { if (stopping) return; stopping = true; kill('SIGTERM'); escalation = setTimeout(() => kill('SIGKILL'), 100); };
     const timer = setTimeout(() => { timedOut = true; stop(); }, input.budgets.timeout_ms);
     const abort = () => stop(); signal.addEventListener('abort', abort, { once: true }); if (signal.aborted) stop();
-    child.stdout.on('data', data => { bytes += data.length; if (bytes > limit) { error = 'product JSONL output exceeds limit'; stop(); } else appendFileSync(eventFile, data); });
+    const consumeLine = (line: string) => {
+      let event: unknown; try { event = JSON.parse(line); } catch { return; }
+      if (!object(event) || event.protocol_version !== 1) return;
+      if (event.type === 'tool_call') {
+        stepsUsed++; args.onSteps?.(stepsUsed);
+        if (stepsUsed > input.budgets.max_steps && !stopReason) {
+          stopReason = `step budget exhausted: ${stepsUsed} tool calls observed, maximum ${input.budgets.max_steps}`; stop();
+        }
+      } else if (event.type === 'usage' && object(event.usage)) {
+        const values: NonNullable<Outcome['usage']> = {};
+        for (const key of ['input_tokens', 'output_tokens', 'cost'] as const) {
+          const value = event.usage[key];
+          if (typeof value === 'number' && Number.isFinite(value) && value >= 0) values[key] = value;
+        }
+        usage = { ...usage, ...values };
+      }
+    };
+    child.stdout.on('data', data => {
+      bytes += data.length;
+      if (bytes > limit) { error = 'product JSONL output exceeds limit'; stop(); return; }
+      appendFileSync(eventFile, data); pending += decoder.write(data);
+      const lines = pending.split('\n'); pending = lines.pop()!;
+      for (const line of lines) consumeLine(line);
+    });
     child.stderr.on('data', data => appendFileSync(join(artifacts, 'stderr.log'), data));
     child.stdin.on('error', () => {}); child.stdin.end(JSON.stringify(request) + '\n');
     child.on('error', e => { error = e.message; }); child.on('exit', stop);
-    child.on('close', code => { clearTimeout(timer); signal.removeEventListener('abort', abort); stop(); setTimeout(() => {
-      clearTimeout(escalation); kill('SIGKILL'); done({ code, timedOut, error });
+    child.on('close', code => { pending += decoder.end(); if (pending.trim()) consumeLine(pending); clearTimeout(timer); signal.removeEventListener('abort', abort); stop(); setTimeout(() => {
+      clearTimeout(escalation); kill('SIGKILL'); done({ code, timedOut, error, stepsUsed, stopReason, usage });
     }, 120); });
   });
-  if (outcome.code !== 0 || outcome.timedOut || outcome.error || signal.aborted) return outcome;
+  if (outcome.code !== 0 || outcome.timedOut || outcome.error || outcome.stopReason || signal.aborted) return outcome;
   try {
     const lines = readFileSync(eventFile, 'utf8').split('\n').filter(line => line.trim());
     let final: unknown; let finals = 0; const calls: unknown[] = []; const files = new Set<string>();
@@ -119,6 +146,6 @@ export async function invokeJacksonBotPi(args: {
     return outcome;
   } catch (error) {
     appendFileSync(join(artifacts, 'stderr.log'), `protocol: ${(error as Error).message}\n`);
-    return { code: 1, timedOut: false };
+    return { ...outcome, code: 1 };
   }
 }

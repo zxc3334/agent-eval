@@ -455,3 +455,15 @@ pnpm validate:e7:docker     # 真实 Docker 验收脚本，全部预期符合才
 E7 fixture 使用 `formal: false`、`reviewed: false`，专用 Docker 验收不冒充 E5b Oracle 校准或人工审核。既有校准内容哈希纳入新冻结/容器/时钟实现，旧正式凭证需重校准。E8 真实 adapter、外网模型、Harbor/Workbench runtime 迁移未实现。
 
 E7 Issue（Notion）：https://app.notion.com/p/405e1347ee97813a874cee088440fec6
+
+## E9：复现与重复运行
+
+```sh
+pnpm validate:e9
+pnpm eval --suite smoke --case smoke-pass --agent stub --repeat 3
+pnpm eval --rerun <run-id> --runs-dir runs
+```
+
+每次运行的 `config.json` 保存有效配置，`manifest.json` 保存 suite、case 引用文件、adapter、verifier、harness 的版本及 SHA-256、产品 revision、模型/采样参数、平台、可取得的本地镜像 ID，以及运行产物哈希。无法取得的值为 `unknown`；manifest 不对自身求哈希。`--rerun` 使用原配置和当前文件，执行前展示差异；无法确定的镜像或产品 revision 会明确标注不能核对。复跑并不保证模型输出逐字一致。修改本地文件或版本后仍可运行，以便观察差异；无效配置仍会被校验拒绝。
+
+`--repeat N` 为每个 case 保留 N 次独立 trial、session 和 workspace；报告列出每次结果及通过次数，并记录未执行的试次。`--fail-fast` 或中断会停止后续试次。agent 与 verifier 使用各自的超时，进度行显示当前 case、阶段、耗时和已知步骤。产品 adapter 将 JSONL `tool_call` 作为步骤，观察到超过预算时终止进程并记录原因；产品仍须自行遵守传入的预算，因为 harness 无法撤销已发生的调用。container 没有计步协议，显示 `unknown`。产品可通过 `usage` 事件提供 input_tokens、output_tokens 和 cost；未提供的值显示 `unknown`，可用的零值仍显示 0。
