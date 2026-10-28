@@ -1,0 +1,39 @@
+{
+  "config": {
+    "agent": "stub",
+    "experiment": { "adapter": "stub", "model": null, "product": {} },
+    "suite": "fixed",
+    "case_ids": ["regression", "improvement", "unchanged", "fault"],
+    "repeat": 1,
+    "fail_fast": false
+  },
+  "manifest": {
+    "schema_version": 1,
+    "suite": { "name": "fixed", "version": "1.0.0", "schema_version": 2, "sha256": "suite-hash" },
+    "cases": [
+      { "id": "regression", "version": "1.0.0", "image": null, "files": { "case.json": "case-1", "acceptance.json": "acceptance-1" } },
+      { "id": "improvement", "version": "1.0.0", "image": null, "files": { "case.json": "case-2", "acceptance.json": "acceptance-2" } },
+      { "id": "unchanged", "version": "1.0.0", "image": null, "files": { "case.json": "case-3", "acceptance.json": "acceptance-3" } },
+      { "id": "fault", "version": "1.0.0", "image": null, "files": { "case.json": "case-4", "acceptance.json": "acceptance-4" } }
+    ],
+    "adapter": { "name": "stub", "version": "1.0.0", "sha256": "adapter-hash", "files": {} },
+    "verifier": { "version": "1.0.0", "sha256": "verifier-hash", "files": {} },
+    "harness": { "version": "1.0.0", "sha256": "harness-hash", "files": {} },
+    "product_revision": "revision-a",
+    "effective_config": {
+      "experiment": { "adapter": "stub", "model": null, "product": {} },
+      "suite": "fixed",
+      "case_ids": ["regression", "improvement", "unchanged", "fault"],
+      "fail_fast": false,
+      "repeat": 1
+    },
+    "experiment_sha256": "experiment-hash",
+    "experiment_extra_fields": {},
+    "model": "unknown",
+    "sampling": "unknown",
+    "platform": { "os": "fixture-os", "release": "1", "arch": "fixture-arch", "node": "fixture-node" },
+    "images": {}, "images_used": {}, "artifacts": {}
+  },
+  "baseline": { "regression": "pass", "improvement": "fail", "unchanged": "pass", "fault": "pass" },
+  "candidate": { "regression": "fail", "improvement": "pass", "unchanged": "pass", "fault": "agent_error" }
+}

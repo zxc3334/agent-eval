@@ -467,3 +467,20 @@ pnpm eval --rerun <run-id> --runs-dir runs
 每次运行的 `config.json` 保存有效配置，`manifest.json` 保存 suite、case 引用文件、adapter、verifier、harness 的版本及 SHA-256、产品 revision、模型/采样参数、平台、可取得的本地镜像 ID，以及运行产物哈希。无法取得的值为 `unknown`；manifest 不对自身求哈希。`--rerun` 使用原配置和当前文件，执行前展示差异；无法确定的镜像或产品 revision 会明确标注不能核对。复跑并不保证模型输出逐字一致。修改本地文件或版本后仍可运行，以便观察差异；无效配置仍会被校验拒绝。
 
 `--repeat N` 为每个 case 保留 N 次独立 trial、session 和 workspace；报告列出每次结果及通过次数，并记录未执行的试次。`--fail-fast` 或中断会停止后续试次。agent 与 verifier 使用各自的超时，进度行显示当前 case、阶段、耗时和已知步骤。产品 adapter 将 JSONL `tool_call` 作为步骤，观察到超过预算时终止进程并记录原因；产品仍须自行遵守传入的预算，因为 harness 无法撤销已发生的调用。container 没有计步协议，显示 `unknown`。产品可通过 `usage` 事件提供 input_tokens、output_tokens 和 cost；未提供的值显示 `unknown`，可用的零值仍显示 0。
+
+## E10：显式基线与逐例比较
+
+```sh
+pnpm eval baseline set <run-id> --runs-dir runs
+pnpm eval compare <baseline-run> <candidate-run> --runs-dir runs
+pnpm eval compare <baseline-run> <candidate-run> --vary model --vary product_revision --runs-dir runs
+pnpm validate:e10
+```
+
+`baseline set` 只接受已有完成清单的 run，在 `runs/baseline.json` 记录当前选择及每次选择的时间和历史。新 run 不修改该记录。比较明确指定两侧 ID，输出终端摘要以及 `runs/comparisons/<baseline>--<candidate>/compare.json`、`compare.md`；再次比较同一对会更新该目录。
+
+比较先检查 suite、case 和 verifier 的内容版本及哈希、执行器和实验身份、重复策略以及配置和环境差异。`--vary` 可重复声明预期变化：`model`、`prompt`（实验配置的 `product.prompt`）、`product_revision`。报告展示声明的变量和其他差异；不兼容时列原因、退出 2，且不输出整体结论。stub、Oracle 和本地容器仅用于评测链路，不代表产品能力；不同执行器不能混用形成能力结论。
+
+逐例按重复试次的通过数分类：`improve`、`regress`、`flat`；任一侧故障或未执行则为 `error-change`，不纳入整体结论。Markdown 对每侧试次提供结果与断言、事件轨迹和产物链接，缺失证据显示 unavailable。比较是离线分析，不运行 agent、不修改产品或基线。
+
+E9 旧清单没有记录实验配置中被投影掉的额外字段：若实验文件摘要发生变化，比较会保守地判为不可核实。E10 新 run 对这些额外字段记录值哈希；产品真实 revision/model 或容器镜像摘要未知时也无法给出整体结论。suite 没有显式 version 时使用清单的内容哈希。
