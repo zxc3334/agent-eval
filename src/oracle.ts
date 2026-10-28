@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { localFile } from './config.ts';
 import { invokeNode } from './process.ts';
@@ -36,7 +37,7 @@ export async function invokeOracle(gold: GoldSource, input: OracleInput, caseDir
   // Resolve aliases before applying Node permissions (e.g. macOS /var -> /private/var).
   const work = realpathSync(workspace); const entry = realpathSync(solve);
   return invokeNode(work, artifacts, temp, input.budgets.timeout_ms, [
-    '--permission', `--allow-fs-read=${work}`, `--allow-fs-read=${entry}`,
+    '--permission', `--allow-fs-read=${fileURLToPath(new URL('./clock.cjs', import.meta.url))}`, `--allow-fs-read=${work}`, `--allow-fs-read=${entry}`,
     `--allow-fs-write=${work}`, entry,
   ], signal);
 }

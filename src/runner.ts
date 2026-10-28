@@ -26,14 +26,16 @@ export async function run(options: Options, signal: AbortSignal = new AbortContr
   const configSource = `${options.casesDir} (current files; suite=${options.suite})`;
   json(join(dir, 'config.json'), { run_id: runId, agent: options.agent, experiment, experiment_file: options.experimentFile, suite: options.suite, cases_dir: options.casesDir, case_ids: ids, case_refs: ids.map(id => refs.find(ref => ref.id === id)!), config_source: configSource, source_run_id: options.sourceRunId ?? null, fail_fast: options.failFast, cases });
   console.log(LOCAL_EVALUATION_NOTICE);
+  console.log(options.agent === 'container' ? 'Isolation: Docker agent + fresh verifier; local scripted fixture, not a product adapter.' : 'Isolation: trusted-local; no Docker and no security sandbox.');
   console.log(`Run ${runId}\nRun directory: ${dir}\nConfiguration source: ${configSource}\nSource run: ${options.sourceRunId ?? 'none'}`);
   let error: string | undefined;
   try {
     for (const [index, c] of cases.entries()) {
       if (signal.aborted) break;
-      const result = await evaluate(c, dir, signal, golds[index]);
+      const result = await evaluate(c, dir, signal, golds[index], undefined, options.agent);
       console.log(`${result.status.toUpperCase()} ${result.case_id} ${result.duration_ms}ms`);
       for (const a of result.assertions.filter(a => !a.passed)) console.log(`  ${a.criterion_id} [${a.mode}]: expected=${JSON.stringify(a.expected)} actual=${JSON.stringify(a.actual)}\n  reason: ${a.reason}${a.problem ? `\n  problem: ${a.problem}` : ''}\n  artifact: ${a.artifact}`);
+      for (const error of result.handoff_errors ?? []) console.log(`  ${error}; see ${result.artifact_manifest}`);
       if (result.reason) console.log(`  stage=${result.stage}: ${result.reason}\n  events: ${result.events}`);
       json(join(dir, 'state.json'), { interrupted: signal.aborted }); generateReport(dir);
       if (options.failFast && result.status !== 'pass') break;

@@ -412,3 +412,46 @@ smoke 选 `fixed-retrieval`（资料与事实）、`tool-result`（工具参数�
 两个新 suite 均为 `formal: false`，全部源 case 保持 `reviewed: false`。E5b 的正式审核门禁仍适用于 source 引用的每个成员；本票未授予人工审核。`--failed-from` 继续读取原种子的当前内容，watch 也监听引用目录。真实 adapter、外网模型、E7+ 和 Harbor/Workbench runtime 均未纳入。
 
 E6c Issue（Notion）：https://app.notion.com/p/405e1347ee9781ecab23ecbe1568778a
+
+## E7：独立 trial、冻结产物与容器功能验收
+
+```sh
+pnpm validate:e7             # 无 Docker 的边界/生命周期/回归测试，exit 0
+pnpm eval:smoke              # 旧 stub 链路仍无需 Docker，预期 exit 1
+pnpm eval validate --schema-only --suite e7-code
+
+docker info
+docker pull node:24-alpine   # 首次由本地操作者准备镜像；runner 不会自动拉取
+pnpm eval:e7                # code-fix pass + code-tamper fail，预期 exit 1
+pnpm validate:e7:docker     # 真实 Docker 验收脚本，全部预期符合才 exit 0
+```
+
+每个 trial 排他创建 workspace，生成随机 session ID，恢复公开 input、fixture、initial-state。`case.json.clock` 可指定固定 UTC ISO 时间，默认 `2026-01-01T00:00:00.000Z`。Node 的 `Date()`、`new Date()` 与 `Date.now()` 使用固定时间；计时器与 runner 超时仍使用真实时间。shell/其他语言可读取 `AGENT_EVAL_NOW`（毫秒）；这不是修改容器内核时钟，也不阻止受测代码主动重定义自己的时钟。已有目录不会被合并复用。重跑仍由原 suite、`--case`、`--failed-from`、watch 路径处理。
+
+执行器停止后才冻结声明产物。可信本地进程沿用进程组清理；容器路径等待 `docker rm --force` 成功，清理未确认时禁止交接。`artifact-manifest.json` 记录 session、停止标记、文件名、字节数、SHA-256 和缺失项；`frozen/` 保存复制后的只读文件，后续 workspace 写入不会改变它。文件名仍限平铺文件，不支持目录/glob，拒绝越界、符号链接（包括指向白名单内的链接及悬空链接）、硬链接和特殊文件。`artifacts/` 保留原报告所用的兼容副本及日志；容器只挂载 `frozen/`，不挂载兼容副本或日志。
+
+容器缺少任何声明产物都以 `environment_error / artifact_handoff` 停止，不启动 verifier。已有 stub/Oracle 的缺失证据继续交给原 criteria 判 fail，并在清单、终端和报告额外输出明确 handoff diagnostic 与排查命令，保持 E6 的负例和校准语义；非声明必验文件缺失不会新增硬断言。
+
+`--agent container` 是 E7 的本地脚本夹具执行器，不是真实 jackson-bot adapter。需要 `case.json.execution`：
+
+```json
+{
+  "image": "node:24-alpine",
+  "command": ["sh", "-c", "node agent.cjs"],
+  "public_files": { "agent.cjs": "agent.cjs", "add.cjs": "add.cjs", "public-test.cjs": "public-test.cjs" },
+  "private_tests": "verify.cjs",
+  "verifier_command": ["node", "/tests/verify.cjs"]
+}
+```
+
+公开文件通过显式映射复制进新 workspace，公开输入不能引用私有验收/测试/Gold 的同一文件（也检查链接别名）。agent 容器只挂载该 workspace。runner 将本地镜像引用解析成 image ID，agent 和 verifier 使用同一 ID；不提交或复用 agent 容器。agent 移除、产物冻结后才新建 verifier 容器，只只读挂载冻结产物 `/artifacts` 与新复制的私有测试 `/tests`。两种容器均禁网、根文件系统只读、无额外 capabilities、限制进程数/内存/CPU，不挂评测仓库、Docker socket 或宿主环境变量。结果与日志由宿主收集，独立存于 `verifier/container-*/`；原 JSON criteria 仍由共享 worker 检查数据，代码功能检查只在 verifier 容器执行。
+
+私有脚本退出 0 表示功能通过、1 表示功能不满足，其他状态、OOM、超时、无法确认容器退出等均是运行错误，不能当作通过。runner 还检查 daemon 的实际容器退出状态，不能仅凭 Docker CLI 返回码判定。镜像与私有 verifier 均属于可信本地评测配置；fixture 的 verifier 在受 Node 权限限制的子进程中执行提交代码，该子进程不能读取 `/tests` 或创建子进程。
+
+`cases/e7-code` 的两例均把公开伪测试改成无条件通过。`code-fix` 同时修复加法，`code-tamper` 保留减法错误；二者 `answer.json` 都报告 done，只有隐藏功能检查决定差异。`validate:e7:docker` 再跑一轮确认状态、时钟和文件不串入，并检查缺失文件、指向 `/etc/passwd` 的符号链接、超时均不进入 verifier。每次使用临时 case 副本，证据保存至 `runs/e7-validation-*/validation.json` 及其 trials。Docker 不可用时返回 2，明确失败，不会跳过或回退到宿主执行代码。
+
+错误包含阶段、原因、可复制的排查命令：`docker_preflight`（`docker version/context show/info`）、`image_prepare`（`docker image inspect/pull`）、`artifact_handoff`（`ls -la` 和查看快照/清单）；容器创建、执行、清理也分别记录阶段。CLI 和报告明确标注可信本地 stub/Oracle **不具备安全沙箱隔离**。Docker 路径仍依赖可信 daemon、镜像和宿主，不宣称抵御内核/daemon 漏洞。
+
+E7 fixture 使用 `formal: false`、`reviewed: false`，专用 Docker 验收不冒充 E5b Oracle 校准或人工审核。既有校准内容哈希纳入新冻结/容器/时钟实现，旧正式凭证需重校准。E8 真实 adapter、外网模型、Harbor/Workbench runtime 迁移未实现。
+
+E7 Issue（Notion）：https://app.notion.com/p/405e1347ee97813a874cee088440fec6

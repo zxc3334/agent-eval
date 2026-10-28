@@ -101,7 +101,9 @@ test('serialized AgentInput excludes private fields and experiment choices; arti
       artifact_allowlist: ['answer.json'], budgets: { timeout_ms: 2000, max_steps: 1 },
     });
     assert.doesNotMatch(readFileSync(publicFile, 'utf8'), /PRIVATE_|gold|criteria|error_examples|reviewed|adapter|model|product|acceptance/);
-    assert.deepEqual(readdirSync(join(caseDir, 'workspace')).sort(), ['answer.json', 'input.json', 'resource.json']);
+    assert.deepEqual(readdirSync(join(caseDir, 'workspace')).sort(), ['answer.json', 'clock.cjs', 'fixture.json', 'initial-state.json', 'input.json', 'resource.json', 'session.json']);
+    for (const name of ['fixture.json', 'initial-state.json', 'session.json']) assert.doesNotMatch(readFileSync(join(caseDir, 'workspace', name), 'utf8'), /PRIVATE_|criteria|error_examples|acceptance/);
+    assert.deepEqual(readdirSync(join(caseDir, 'frozen')).sort(), ['answer.json']);
     assert.deepEqual(readdirSync(join(caseDir, 'artifacts')).sort(), ['answer.json', 'stderr.log', 'stdout.log']);
     assert.deepEqual(read(join(caseDir, 'snapshot.json')).acceptance, privateFields);
     const saved = read(join(run, 'config.json'));
