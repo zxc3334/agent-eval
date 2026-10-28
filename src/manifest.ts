@@ -29,6 +29,7 @@ function caseFiles(c: LoadedCase): Record<string, string> {
   const config = c.config;
   const names = new Set(['case.json', config.input, config.fixture, config.initial_state, config.acceptance]);
   if (config.brief) names.add(config.brief);
+  if (config.source_evidence) names.add(config.source_evidence.result);
   if (config.execution) {
     names.add(config.execution.private_tests);
     for (const file of Object.values(config.execution.public_files)) names.add(file);

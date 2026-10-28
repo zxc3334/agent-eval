@@ -484,3 +484,17 @@ pnpm validate:e10
 逐例按重复试次的通过数分类：`improve`、`regress`、`flat`；任一侧故障或未执行则为 `error-change`，不纳入整体结论。Markdown 对每侧试次提供结果与断言、事件轨迹和产物链接，缺失证据显示 unavailable。比较是离线分析，不运行 agent、不修改产品或基线。
 
 E9 旧清单没有记录实验配置中被投影掉的额外字段：若实验文件摘要发生变化，比较会保守地判为不可核实。E10 新 run 对这些额外字段记录值哈希；产品真实 revision/model 或容器镜像摘要未知时也无法给出整体结论。suite 没有显式 version 时使用清单的内容哈希。
+
+### E11：实验与失败证据回灌
+
+复制 [实验模板](experiments/feedback.template.json)，填写假设、需求、两个 run ID 和预期变化；它与 adapter 的 `--experiment` 配置分开。比较时通过 `--experiment-record <文件>` 关联记录：
+
+```sh
+pnpm eval compare <baseline-run> <candidate-run> --experiment-record <文件> --runs-dir runs
+pnpm eval case new <新case-id> --from-run <run-id> --case <原case-id> --suite <草稿suite> --runs-dir runs
+pnpm validate:e11
+```
+
+来源必须是有需求 ID 的失败 case。草稿保存原始失败 trial 的证据，Gold、验收和错误对照需要独立编写；失败输出不会成为 Gold。填写后执行 `pnpm eval validate --suite <草稿suite>`，检查 Oracle 和错误对照证据，再将 `acceptance.json` 的 `reviewed` 设为 `true`。审核门槛绑定校准内容；更改后需重新校准。加入 suite 会更新 suite 版本，旧运行与新 suite 的运行比较时将标为不兼容。
+
+run 的需求覆盖基于运行时记录的 suite case 与其 requirement_id；未关联需求的 case 和没有执行或评分的情况会列为缺口，并不声称覆盖外部需求目录。比较报告将两侧证据及实验记录快照在比较目录中；复制整个 run 或比较目录后，可用 `pnpm eval report <目录名> --runs-dir <父目录>` 从现有证据重新生成报告，无需调用模型。

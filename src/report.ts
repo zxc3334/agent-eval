@@ -4,6 +4,7 @@ import { readJson } from './config.ts';
 import { json } from './storage.ts';
 import { compareUsedImages } from './manifest.ts';
 import type { Result, Status } from './types.ts';
+import { localLink, requirementCoverage } from './coverage.ts';
 
 export const LOCAL_EVALUATION_NOTICE = '只验证评测链路（仅验评测链路），不代表产品/模型质量；未运行真实 jackson-bot adapter 或外网模型。';
 
@@ -30,7 +31,14 @@ export function generateReport(dir: string) {
   const caseCounts = config.case_ids.map((id: string) => ({ case_id: id, passed: results.filter(r => r.case_id === id && r.status === 'pass').length, attempted: results.filter(r => r.case_id === id).length, planned: repeat }));
   const missingAttempts = attempts.filter(a => !a.result).map(a => ({ case_id: a.id, trial: a.trial }));
   const code = state.interrupted || state.error || attempted > scored ? 2 : counts.fail ? 1 : 0;
+  const coverage = requirementCoverage(dir, config);
+  const attempt_evidence = attempts.map(a => {
+    const base = repeat === 1 ? `cases/${a.id}` : `cases/${a.id}/trials/${a.trial}`;
+    const path = (name: string) => existsSync(join(dir, base, name)) ? `${base}/${name}` : null;
+    return { case_id: a.id, trial: a.trial, result: path('result.json'), events: path('events.jsonl'), artifacts: path('artifacts') };
+  });
   const summary = {
+    ...coverage, attempt_evidence,
     run_id: config.run_id, agent: config.agent, source_run_id: config.source_run_id ?? null,
     evaluation_scope: config.agent === 'jackson-bot-pi' ? 'product_adapter' : 'pipeline_only', scope_note: scopeNote,
     real_agent_attempted: realResults.length, real_agent_pass_rate: realResults.length ? realResults.filter(r => r.status === 'pass').length / realResults.length : null,
@@ -47,7 +55,10 @@ export function generateReport(dir: string) {
   const lines = [`# Run ${config.run_id}`, '', `> ${scopeNote}`, '', `Agent: ${config.agent} (${agentDescription})`, `Configuration: ${config.config_source}`, `Source run: ${config.source_run_id ?? 'none'}`, '',
     `Attempted: ${attempted}/${summary.planned}; scored: ${scored}`, `All-attempt pass rate: ${pct(summary.pass_rate)} (pass / attempted)`, `Scoring coverage: ${pct(summary.scoring_coverage)} ((pass + fail) / attempted)`,
     `Counts: ${JSON.stringify(counts)}`, `Not attempted: ${notAttempted.join(', ') || 'none'}`, `Interrupted: ${summary.interrupted}; exit code: ${code}`, ''];
-  lines.push(`Configuration snapshot: ${join(resolve(dir), 'config.json')}`, `Manifest: ${join(resolve(dir), 'manifest.json')}`, `Rerun: ${rerun}`, 'Model output is not guaranteed to be identical on rerun.', '', '## Per-case pass counts', '');
+  lines.push(`Configuration snapshot: ${localLink('config.json', 'config.json')}`, ...(existsSync(join(dir, 'manifest.json')) ? [`Manifest: ${localLink('manifest.json', 'manifest.json')}`] : []), `Rerun: ${rerun}`, 'Model output is not guaranteed to be identical on rerun.', '', '## Requirement coverage', '');
+  for (const c of coverage.requirement_coverage) lines.push(`- ${c.requirement_id}: ${c.covered ? (c.scored ? 'covered and scored' : 'attempted, not scored') : 'uncovered'}; cases: ${c.case_ids.join(', ')}; not attempted: ${c.uncovered_case_ids.join(', ') || 'none'}; not scored: ${c.unscored_case_ids.join(', ') || 'none'}; ${c.evidence.map(p => localLink(p, 'result')).join(', ') || 'no evidence'}`);
+  if (!coverage.requirement_coverage.length) lines.push('- No requirement mappings recorded.');
+  lines.push(`Unmapped cases: ${coverage.uncovered_cases.join(', ') || 'none'}`, '', '## Per-case pass counts', '');
   if (existsSync(join(dir, 'manifest.json'))) {
     const warnings = compareUsedImages(readJson(join(dir, 'manifest.json')));
     if (warnings.length) lines.push(...warnings.map(warning => `Image mismatch: ${warning}`), '');
@@ -59,7 +70,9 @@ export function generateReport(dir: string) {
     const r = attempt.result;
     if (!r) { lines.push(`## ${attempt.id} trial ${attempt.trial}: not attempted`, ''); continue; }
     const value = (n: number | null | undefined) => n === null || n === undefined ? 'unknown' : String(n);
-    lines.push(`## ${r.case_id} trial ${attempt.trial}: ${r.status} (${value(r.duration_ms)}ms)`, '', `Events: ${r.events}`, '', `Input tokens: ${value(r.usage?.input_tokens)}; output tokens: ${value(r.usage?.output_tokens)}; cost: ${value(r.usage?.cost)}`, `Steps used: ${value(r.steps_used)}; stop reason: ${r.stop_reason ?? 'unknown'}`, '');
+    const trialPath = repeat === 1 ? `cases/${attempt.id}` : `cases/${attempt.id}/trials/${attempt.trial}`;
+    const evidenceLinks = ['result.json', 'events.jsonl', 'artifacts'].filter(name => existsSync(join(dir, trialPath, name))).map(name => localLink(`${trialPath}/${name}`, name)).join('; ');
+    lines.push(`## ${r.case_id} trial ${attempt.trial}: ${r.status} (${value(r.duration_ms)}ms)`, '', `Evidence: ${evidenceLinks}`, '', `Input tokens: ${value(r.usage?.input_tokens)}; output tokens: ${value(r.usage?.output_tokens)}; cost: ${value(r.usage?.cost)}`, `Steps used: ${value(r.steps_used)}; stop reason: ${r.stop_reason ?? 'unknown'}`, '');
     if (r.reason) lines.push(`Stage: ${r.stage}; reason: ${r.reason}`, '');
     lines.push(`Isolation: ${r.isolation ?? 'trusted-local'}${r.isolation === 'docker' ? '' : ' (no security sandbox)'}; session: ${r.session_id ?? 'legacy'}`, '');
     if (r.artifact_manifest) lines.push(`Artifact manifest: ${r.artifact_manifest}`, '');

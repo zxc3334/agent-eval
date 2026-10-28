@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
@@ -15,12 +15,23 @@ export async function validateSuite(casesDir: string, suite: string, runsDir: st
   const output = relative(casesDir, runsDir);
   if (output === '' || (!isAbsolute(output) && output !== '..' && !output.startsWith(`..${sep}`))) throw new Error('runs-dir: calibration output must be outside the cases directory');
   const refs = suiteCases(casesDir, suite);
+  const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID()}`;
+  const dir = join(runsDir, runId); mkdirSync(dir, { recursive: true });
+  // Revoke all old receipts before loading or executing calibration inputs.
+  // A malformed case or interrupted calibration must never retain prior success.
+  for (const ref of refs) {
+    const file = caseFile(casesDir, suite, ref);
+    json(join(dirname(file), RECEIPT), { schema_version: 1, status: 'pending', run_id: runId });
+  }
   // Snapshot the complete suite before running any reference solution/control.
   const snapshots = refs.map(ref => {
     try {
       const file = caseFile(casesDir, suite, ref);
       const hash = contentHash(file);
       const c = loadCase(casesDir, suite, ref); const gold = loadGold(c.file);
+      if (c.config.source_evidence && /TODO/i.test(JSON.stringify({ gold: c.acceptance.gold, criteria: c.acceptance.criteria, controls: c.acceptance.error_examples }) + readFileSync(join(dirname(c.file), 'gold.md'), 'utf8') + readFileSync(join(dirname(c.file), 'solve.ts'), 'utf8'))) {
+        throw new Error('feedback case: replace TODO placeholders in Gold, criteria and error controls before calibration');
+      }
       const criteria = normalizeCriteria(c.acceptance.criteria, c.file);
       for (const [index, example] of c.acceptance.error_examples.entries()) {
         if (example.expected_failed_criteria?.some(id => !criteria.some(c => c.id === id && c.mode === 'hard'))) {
@@ -31,15 +42,9 @@ export async function validateSuite(casesDir: string, suite: string, runsDir: st
       return { ref, c, gold, hash };
     } catch (error) { return { ref, error: (error as Error).message }; }
   });
-  const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID()}`;
-  const dir = join(runsDir, runId); mkdirSync(dir, { recursive: true });
   json(join(dir, 'config.json'), { kind: 'calibration', run_id: runId, suite, cases_dir: casesDir,
     case_ids: refs.map(r => r.id), controls_planned: snapshots.every(s => s.c) ? snapshots.reduce((sum, s) => sum + s.c!.acceptance.error_examples.length, 0) : null });
   console.log(`Calibration ${runId}\nCalibration directory: ${dir}`);
-  // Revoke previous success before work starts; interruptions cannot reuse it.
-  for (const s of snapshots) {
-    if (s.c) json(join(dirname(s.c.file), RECEIPT), { schema_version: 1, status: 'pending', content_hash: s.hash, run_id: runId });
-  }
   let error: string | undefined;
   try {
     for (const s of snapshots) {
