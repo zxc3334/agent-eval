@@ -1,0 +1,9 @@
+{
+  "adapter": "jackson-bot-pi",
+  "model": null,
+  "product": {
+    "path": "",
+    "revision": "",
+    "entry": ""
+  }
+}

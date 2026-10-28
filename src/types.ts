@@ -61,7 +61,7 @@ export interface LoadedCase {
 }
 // Execution choices belong to the harness, not to the task presented to the agent.
 export interface ExperimentConfig {
-  adapter: 'stub' | 'oracle' | 'container'; model: string | null; product: Record<string, unknown>;
+  adapter: 'stub' | 'oracle' | 'container' | 'jackson-bot-pi'; model: string | null; product: Record<string, unknown>;
 }
 export interface Assertion {
   criterion_id: string; expected: unknown; actual: unknown; passed: boolean; artifact: string;
@@ -72,6 +72,7 @@ export interface Result {
   case_id: string; status: Status; duration_ms: number; assertions: Assertion[];
   stage?: string; reason?: string; events: string; verifier_result_dir?: string;
   session_id?: string; isolation?: 'trusted-local' | 'docker'; artifact_manifest?: string; handoff_errors?: string[];
+  agent_started?: boolean;
 }
 export interface Options {
   suite: string; agent: string; casesDir: string; runsDir: string; caseId?: string;

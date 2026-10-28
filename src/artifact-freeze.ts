@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { json } from './storage.ts';
 
-export const RESERVED_FILES = ['input.json', 'stdout.log', 'stderr.log', 'session.json', 'fixture.json', 'initial-state.json', 'clock.cjs', 'artifact-manifest.json'];
+export const RESERVED_FILES = ['input.json', 'stdout.log', 'stderr.log', 'session.json', 'fixture.json', 'initial-state.json', 'clock.cjs', 'artifact-manifest.json', 'product-request.json', 'product-events.jsonl'];
 export function outputName(name: unknown): name is string {
   return typeof name === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(name) && !RESERVED_FILES.includes(name);
 }

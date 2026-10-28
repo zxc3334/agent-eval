@@ -10,11 +10,12 @@ import { ExecutionError, prepareImage, runContainer, stagePublicFiles, verifyCon
 import { normalizeCriteria } from './criteria.ts';
 import { verify } from './verifier.ts';
 import { invokeOracle, oracleInput } from './oracle.ts';
+import { invokeJacksonBotPi } from './jackson-bot-pi.ts';
 import type { GoldSource } from './oracle.ts';
 import type { DockerCommand } from './container.ts';
-import type { ErrorExample, LoadedCase, Result } from './types.ts';
+import type { ErrorExample, LoadedCase, Result, ExperimentConfig } from './types.ts';
 
-export async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal, gold?: GoldSource, counterexample?: ErrorExample, executionMode = 'stub', docker: DockerCommand = dockerCommand): Promise<Result> {
+export async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal, gold?: GoldSource, counterexample?: ErrorExample, executionMode = 'stub', docker: DockerCommand = dockerCommand, experiment?: ExperimentConfig): Promise<Result> {
   const start = performance.now(); const caseDir = join(dir, 'cases', c.config.id);
   const workspace = join(caseDir, 'workspace'); const artifacts = join(caseDir, 'artifacts');
   mkdirSync(caseDir, { recursive: true });
@@ -43,6 +44,8 @@ export async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal, 
       stagePublicFiles(c, workspace);
     }
     stage = 'agent'; event('agent_start', { agent: executor, ...c.input.budgets });
+    if (executor === 'jackson-bot-pi' && (!experiment || experiment.adapter !== 'jackson-bot-pi')) throw new Error('jackson-bot-pi: missing matching experiment');
+    result.agent_started = true;
     const outcome: { code: number | null; timedOut: boolean; error?: string } = executor === 'container'
       ? await runContainer({ role: 'agent', image: image!, workspace, argv: c.config.execution!.command,
         epoch: session.epoch_ms, timeout: c.input.budgets.timeout_ms, logDir: artifacts, signal }, docker)
@@ -50,6 +53,8 @@ export async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal, 
       ? materializeCounterexample(counterexample, workspace)
       : gold
       ? await invokeOracle(gold, input, caseDir, workspace, artifacts, temp, signal)
+      : executor === 'jackson-bot-pi'
+      ? await invokeJacksonBotPi({ experiment: experiment!, input: c.input, workspace, artifacts, temp, session, signal })
       : await invokeStub(workspace, artifacts, temp, c.input.budgets.timeout_ms, c.config.inject, signal);
     event('agent_stopped', { agent: executor, outcome });
     stage = 'artifact_handoff';

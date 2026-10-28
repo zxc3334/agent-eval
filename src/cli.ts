@@ -23,7 +23,7 @@ try {
     help: { type: 'boolean', default: false },
   } });
   if (values.help) {
-    console.log('Usage: pnpm eval [--suite smoke] [--agent stub|oracle|container] [--experiment <json>] [--case <id> | --failed-from <run-id>] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\n       pnpm eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --schema-only [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --suite <name> [--cases-dir <path>] [--runs-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=success/all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
+    console.log('Usage: pnpm eval [--suite smoke] [--agent stub|oracle|container|jackson-bot-pi] [--experiment <json>] [--case <id> | --failed-from <run-id>] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\n       pnpm eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --schema-only [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --suite <name> [--cases-dir <path>] [--runs-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=success/all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
   } else if (positionals[0] === 'validate') {
     if (positionals.length !== 1 || (!values['schema-only'] && !values.suite)) throw new Error('usage: eval validate --suite <name> [--schema-only] [--cases-dir <path>] [--runs-dir <path>]');
     const allowed = values['schema-only'] ? ['schema-only', 'suite', 'cases-dir'] : ['suite', 'cases-dir', 'runs-dir'];
@@ -61,7 +61,7 @@ try {
     console.log(`Report: ${dir}/report.md`);
   } else {
     if (positionals.length) throw new Error('usage: eval [options] | eval report <run-id> | eval case new <id> --requirement <id>');
-    if (values.agent !== undefined && !['stub', 'oracle', 'container'].includes(values.agent)) throw new Error('agent: only stub, oracle and container are supported');
+    if (values.agent !== undefined && !['stub', 'oracle', 'container', 'jackson-bot-pi'].includes(values.agent)) throw new Error('agent: only stub, oracle, container and jackson-bot-pi are supported');
     if (values.case && values['failed-from']) throw new Error('case and failed-from are mutually exclusive');
     const runsDir = resolve(values['runs-dir']!);
     let source: any; let selectedIds: string[] | undefined;

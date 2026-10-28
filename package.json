@@ -18,7 +18,8 @@
     "typecheck": "tsc --noEmit",
     "validate:e7": "node --test --test-concurrency=1 tests/e7.test.ts",
     "validate:e7:docker": "node src/e7-docker-validation.ts",
-    "eval:e7": "node src/cli.ts --suite e7-code --agent container"
+    "eval:e7": "node src/cli.ts --suite e7-code --agent container",
+    "validate:e8": "node --test --test-concurrency=1 tests/e8*.test.ts"
   },
   "devDependencies": {
     "@types/node": "20.17.19",
