@@ -22,8 +22,12 @@ export function contentHash(caseFile: string): string {
     } else add(field, readFileSync(file, 'utf8'));
   }
   for (const name of ['gold.md', 'solve.ts']) add(name, readFileSync(localFile(dir, name, `oracle.${name}`), 'utf8'));
-  for (const name of ['review', 'calibration', 'evaluation', 'oracle', 'process', 'config', 'criteria', 'verifier', 'verifier-worker', 'file-verifier', 'tool-verifier', 'json-fields']) {
+  for (const name of ['artifact-freeze', 'trial', 'container', 'review', 'calibration', 'evaluation', 'oracle', 'process', 'config', 'criteria', 'verifier', 'verifier-worker', 'file-verifier', 'tool-verifier', 'json-fields']) {
     add(`engine/${name}`, readFileSync(new URL(`./${name}.ts`, import.meta.url), 'utf8'));
+  }
+  add('engine/clock', readFileSync(new URL('./clock.cjs', import.meta.url), 'utf8'));
+  if (config.execution) {
+    for (const source of [...Object.values(config.execution.public_files), config.execution.private_tests]) add(String(source), readFileSync(localFile(dir, source, 'execution'), 'utf8'));
   }
   return `sha256:${hash.digest('hex')}`;
 }

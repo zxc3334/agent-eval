@@ -42,12 +42,18 @@ export interface Acceptance {
   reviewed: boolean;
 }
 export interface CaseRef { id: string; version: string; source?: string }
+// Local scripted container fixture, not a product adapter.
+export interface ContainerExecution {
+  image: string; command: string[]; public_files: Record<string, string>;
+  private_tests: string; verifier_command: string[];
+}
 export interface CaseConfig {
   schema_version: 2; id: string; version: string; type: 'positive' | 'negative';
   // Optional for existing v2 cases; authoring metadata never enters AgentInput.
   requirement_id?: string; brief?: string;
   input: string; fixture: string; initial_state: string; acceptance: string;
   artifact_allowlist: string[]; budgets: Budgets;
+  clock?: string; execution?: ContainerExecution;
   inject?: 'agent_error' | 'protocol_error' | 'timeout' | VerifierFault | 'environment_error';
 }
 export interface LoadedCase {
@@ -55,7 +61,7 @@ export interface LoadedCase {
 }
 // Execution choices belong to the harness, not to the task presented to the agent.
 export interface ExperimentConfig {
-  adapter: 'stub' | 'oracle'; model: string | null; product: Record<string, unknown>;
+  adapter: 'stub' | 'oracle' | 'container'; model: string | null; product: Record<string, unknown>;
 }
 export interface Assertion {
   criterion_id: string; expected: unknown; actual: unknown; passed: boolean; artifact: string;
@@ -65,6 +71,7 @@ export interface Assertion {
 export interface Result {
   case_id: string; status: Status; duration_ms: number; assertions: Assertion[];
   stage?: string; reason?: string; events: string; verifier_result_dir?: string;
+  session_id?: string; isolation?: 'trusted-local' | 'docker'; artifact_manifest?: string; handoff_errors?: string[];
 }
 export interface Options {
   suite: string; agent: string; casesDir: string; runsDir: string; caseId?: string;

@@ -3,7 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24.0.0" },
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "packageManager": "pnpm@11.19.0",
   "scripts": {
     "eval": "node src/cli.ts",
@@ -13,7 +15,13 @@
     "validate:e6a": "node src/seed-validation.ts",
     "validate:e6b": "node src/negative-seed-validation.ts",
     "test": "node --test --test-concurrency=1 tests/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "validate:e7": "node --test --test-concurrency=1 tests/e7.test.ts",
+    "validate:e7:docker": "node src/e7-docker-validation.ts",
+    "eval:e7": "node src/cli.ts --suite e7-code --agent container"
   },
-  "devDependencies": { "@types/node": "20.17.19", "typescript": "5.7.3" }
+  "devDependencies": {
+    "@types/node": "20.17.19",
+    "typescript": "5.7.3"
+  }
 }

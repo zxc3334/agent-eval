@@ -1,0 +1,14 @@
+{
+  "gold": {
+    "answer": "done"
+  },
+  "criteria": [
+    {
+      "id": "answer-complete",
+      "type": "equals",
+      "expected": "done"
+    }
+  ],
+  "error_examples": [],
+  "reviewed": false
+}

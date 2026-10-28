@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { FIXED_NOW } from './trial.ts';
+import { readJson } from './config.ts';
 import { fileURLToPath } from 'node:url';
 
 export async function invokeStub(workspace: string, artifacts: string, temp: string, timeout: number, inject: string | undefined, signal: AbortSignal): Promise<{ code: number | null; timedOut: boolean; error?: string }> {
@@ -11,9 +13,9 @@ export async function invokeStub(workspace: string, artifacts: string, temp: str
 export async function invokeNode(workspace: string, artifacts: string, temp: string, timeout: number, args: string[], signal: AbortSignal): Promise<{ code: number | null; timedOut: boolean; error?: string }> {
   return new Promise(resolve => {
     let timedOut = false; let error: string | undefined; let stopping = false;
-    const child = spawn(process.execPath, args, {
+    const child = spawn(process.execPath, ['--require', fileURLToPath(new URL('./clock.cjs', import.meta.url)), ...args], {
       cwd: workspace, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, AGENT_EVAL_TEMP: temp },
+      env: { ...process.env, AGENT_EVAL_TEMP: temp, AGENT_EVAL_NOW: String(Date.parse(readJson(join(workspace, 'session.json')).clock ?? FIXED_NOW)) },
     });
     const killGroup = (name: NodeJS.Signals) => {
       if (child.pid) { try { process.kill(-child.pid, name); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ESRCH') error = String(e); } }

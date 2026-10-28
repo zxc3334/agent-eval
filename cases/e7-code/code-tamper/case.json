@@ -1,0 +1,40 @@
+{
+  "schema_version": 2,
+  "id": "code-tamper",
+  "version": "1.0.0",
+  "type": "negative",
+  "requirement_id": "E7",
+  "brief": "brief.md",
+  "input": "input.json",
+  "fixture": "fixture.json",
+  "initial_state": "initial-state.json",
+  "acceptance": "acceptance.json",
+  "artifact_allowlist": [
+    "answer.json",
+    "add.cjs",
+    "proof.json"
+  ],
+  "budgets": {
+    "timeout_ms": 10000,
+    "max_steps": 1
+  },
+  "clock": "2026-01-01T00:00:00.000Z",
+  "execution": {
+    "image": "node:24-alpine",
+    "command": [
+      "sh",
+      "-c",
+      "node agent.cjs"
+    ],
+    "public_files": {
+      "add.cjs": "add.cjs",
+      "public-test.cjs": "public-test.cjs",
+      "agent.cjs": "agent.cjs"
+    },
+    "private_tests": "verify.cjs",
+    "verifier_command": [
+      "node",
+      "/tests/verify.cjs"
+    ]
+  }
+}

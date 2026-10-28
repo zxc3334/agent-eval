@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { resolve, dirname, relative, isAbsolute, sep, win32 } from 'node:path';
 import type { LoadedCase, CaseConfig, CaseRef, Acceptance, AgentInput, ExperimentConfig } from './types.ts';
+import { outputName, RESERVED_FILES } from './artifact-freeze.ts';
 import { normalizeCriteria } from './criteria.ts';
 
 export function readJson(file: string): any {
@@ -82,21 +83,39 @@ export function loadCase(casesDir: string, suite: string, ref: CaseRef): LoadedC
   if (!Number.isInteger(raw.budgets?.timeout_ms) || raw.budgets.timeout_ms < 1 || raw.budgets.timeout_ms > 300000) bad('budgets.timeout_ms', 'expected integer 1..300000');
   if (!Number.isSafeInteger(raw.budgets?.max_steps) || raw.budgets.max_steps < 1) bad('budgets.max_steps', 'expected positive safe integer');
   if (!Array.isArray(raw.artifact_allowlist) || !raw.artifact_allowlist.includes('answer.json')
-    || raw.artifact_allowlist.some((name: unknown) => typeof name !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(name)
-      || ['input.json', 'stdout.log', 'stderr.log'].includes(name))
+    || raw.artifact_allowlist.some((name: unknown) => !outputName(name))
     || new Set(raw.artifact_allowlist).size !== raw.artifact_allowlist.length) bad('artifact_allowlist', 'expected unique output filenames including answer.json; input/log filenames are reserved');
   if (raw.inject !== undefined && !['agent_error', 'protocol_error', 'timeout', 'verifier_error', 'verifier_timeout', 'verifier_missing', 'verifier_invalid', 'environment_error'].includes(raw.inject)) bad('inject', 'unknown fault');
   const dir = dirname(file);
+  if (raw.clock !== undefined && (typeof raw.clock !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(raw.clock) || !Number.isFinite(Date.parse(raw.clock)) || new Date(raw.clock).toISOString() !== raw.clock)) bad('clock', 'expected fixed ISO UTC timestamp');
+  const execution = raw.execution;
+  let privateTest: string | undefined;
+  if (execution !== undefined) {
+    if (!object(execution)) bad('execution', 'expected container configuration');
+    if (typeof execution.image !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_./:@-]*$/.test(execution.image)) bad('execution.image', 'expected local Docker image reference');
+    for (const key of ['command', 'verifier_command']) {
+      if (!Array.isArray(execution[key]) || !execution[key].length || execution[key].some((v: unknown) => typeof v !== 'string' || !v || v.includes('\0'))) bad(`execution.${key}`, 'expected nonempty argv array');
+    }
+    if (!object(execution.public_files) || Object.keys(execution.public_files).some(name => !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(name) || RESERVED_FILES.includes(name))) bad('execution.public_files', 'expected public destination filename to case-local source mapping; metadata names reserved');
+    privateTest = localFile(dir, execution.private_tests, 'execution.private_tests');
+  }
   const acceptanceFile = localFile(dir, raw.acceptance, 'acceptance');
   const goldFiles = ['gold.md', 'solve.ts'].filter(name => existsSync(resolve(dir, name)))
     .map(name => localFile(dir, name, `oracle.${name}`));
-  const privateFiles = [acceptanceFile, ...(briefFile ? [briefFile] : []), ...goldFiles].map(path => statSync(path));
+  const privateFiles = [acceptanceFile, ...(privateTest ? [privateTest] : []), ...(briefFile ? [briefFile] : []), ...goldFiles].map(path => statSync(path));
   const publicFile = (field: 'input' | 'fixture' | 'initial_state'): string => {
     const path = localFile(dir, raw[field], field);
     const info = statSync(path);
     if (privateFiles.some(privateInfo => privateInfo.dev === info.dev && privateInfo.ino === info.ino)) bad(field, 'public reference aliases private acceptance/brief/gold; use a separate public file');
     return path;
   };
+  if (execution) {
+    for (const [name, source] of Object.entries(execution.public_files)) {
+      const path = localFile(dir, source, `execution.public_files.${name}`);
+      const info = statSync(path);
+      if (privateFiles.some(p => p.dev === info.dev && p.ino === info.ino)) bad('execution.public_files', 'public reference aliases private data');
+    }
+  }
   const publicInput = readJson(publicFile('input'));
   if (typeof publicInput?.prompt !== 'string' || !publicInput.prompt.trim()) bad('input.prompt', 'expected nonempty string');
   const fixtureFile = publicFile('fixture');
@@ -141,7 +160,7 @@ export function loadCase(casesDir: string, suite: string, ref: CaseRef): LoadedC
 }
 export function loadExperiment(file: string): ExperimentConfig {
   const raw = readJson(file);
-  if (!['stub', 'oracle'].includes(raw?.adapter)) throw new Error(`${file}: adapter: only stub and oracle are supported`);
+  if (!['stub', 'oracle', 'container'].includes(raw?.adapter)) throw new Error(`${file}: adapter: only stub, oracle and container are supported`);
   if (raw.model !== null && (typeof raw.model !== 'string' || !raw.model.trim())) throw new Error(`${file}: model: expected string or null`);
   if (!object(raw.product)) throw new Error(`${file}: product: expected JSON object`);
   return { adapter: raw.adapter, model: raw.model, product: raw.product };
