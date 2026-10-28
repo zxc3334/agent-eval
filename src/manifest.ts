@@ -65,6 +65,11 @@ export function createManifest(options: Options, cases: LoadedCase[], experiment
     product_revision: productRevision(experiment),
     effective_config: { experiment, suite: options.suite, case_ids: cases.map(c => c.config.id), fail_fast: options.failFast, repeat: (options as Options & { repeat?: number }).repeat ?? 1 },
     experiment_sha256: fileHash(options.experimentFile),
+    // loadExperiment projects known fields. Hash any additional top-level fields
+    // without copying potentially secret values into another run artifact.
+    experiment_extra_fields: Object.fromEntries(Object.entries(JSON.parse(readFileSync(options.experimentFile, 'utf8')))
+      .filter(([key]) => !['adapter', 'model', 'product'].includes(key))
+      .map(([key, value]) => [key, hash(JSON.stringify(value))])),
     model: experiment.model ?? 'unknown', sampling: experiment.product.sampling ?? 'unknown',
     platform: { os: platform(), release: release(), arch: arch(), node: process.version },
     images: Object.fromEntries(images.map(image => [image, imageDigest(image)])),
