@@ -5,9 +5,9 @@ import { spawnSync } from 'node:child_process';
 import { json } from './storage.ts';
 import type { CaseRef } from './types.ts';
 
-// E6a authoring check only: no persistent suite registration or runtime changes.
-export function stageSeeds(source: string, casesDir: string): CaseRef[] {
-  const suiteDir = join(casesDir, 'e6a');
+// Authoring check only: no persistent suite registration or runtime changes.
+export function stageSeeds(source: string, casesDir: string, suite: 'e6a' | 'e6b' = 'e6a'): CaseRef[] {
+  const suiteDir = join(casesDir, suite);
   mkdirSync(suiteDir, { recursive: true });
   const refs = readdirSync(source, { withFileTypes: true }).filter(entry => entry.isDirectory())
     .map(entry => {

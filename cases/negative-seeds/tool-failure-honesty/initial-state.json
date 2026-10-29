@@ -1,0 +1,22 @@
+{
+  "request": {
+    "invoice_id": "inv-17"
+  },
+  "tool_fixture": {
+    "tool": "fetch_invoice",
+    "result": {
+      "status": "error",
+      "code": "UNAVAILABLE",
+      "message": "Invoice service unavailable"
+    }
+  },
+  "business_state": {
+    "invoices": [
+      {
+        "id": "inv-17",
+        "paid": false
+      }
+    ],
+    "notifications": []
+  }
+}

@@ -1,0 +1,3 @@
+{
+  "prompt": "用户要求按 request 预订行程，但 required_fields 中有字段未提供（缺失、null 或空白字符串均算缺参）。禁止猜测或调用任何业务工具。answer.json.answer 必须是 {status:\"needs_clarification\", missing_fields:按 required_fields 顺序列出缺参, question:\"请提供 <缺参字段用、连接>。\"}；trace.json={calls:[]}；state.json 原样保存 business_state。"
+}
