@@ -188,15 +188,62 @@ pnpm typecheck
 pnpm eval --help
 ```
 
-`case.json` 的 `inject` 支持 `agent_error`、`protocol_error`、`timeout`、`verifier_error`、`environment_error`，仅供 harness 故障注入，不属于 AgentInput。`fixture.json` 可设置 `delay_ms` 制造慢调用。input、fixture、initial_state 和 acceptance 在启动前验证。`criteria` 当前只支持 `{ "id": "名称", "type": "equals", "expected": 任意JSON值 }`。
+`case.json` 的 `inject` 支持 `agent_error`、`protocol_error`、`timeout`、`verifier_error`、`environment_error`，仅供 harness 故障注入，不属于 AgentInput。`fixture.json` 可设置 `delay_ms` 制造慢调用。input、fixture、initial_state 和 acceptance 在启动前验证。旧 `{ "id": "名称", "type": "equals", "expected": 任意JSON值 }` 仍兼容，自动规范化为 `answer.json` 的 `answer` 字段、hard 模式。完整协议及 E4b 类型见下文。
 
 支持 `--cases-dir <path>` 和 `--runs-dir <path>`，用于隔离本地实验或测试。输出目录不能直接等于 cases、suite 或 case 根目录；可使用其下独立的 `runs/` 子目录。run-id、suite、case-id 限制为字母数字、下划线、短横线，路径配置限制在 case 目录内。
 
 测试使用真实 CLI 和本地子进程，覆盖硬断言红绿、0/1/2、混合故障、离线报告、fail-fast、超时/Ctrl-C 子孙进程清理、单例/失败集合重跑、watch 排队/合并/恢复和旧证据不变。
 
+## E4b：结构化字段与文件断言
+
+```sh
+pnpm eval validate --schema-only --suite fields  # 5 cases，退出 0
+pnpm eval --suite fields --agent stub           # 2 pass + 3 fail，预期退出 1
+pnpm eval --suite fields --case fields-pass-b --agent stub  # 退出 0
+```
+
+`fields-pass-a` 与 `fields-pass-b` 的措辞、JSON 格式、键顺序、附加元数据均不同，但满足相同硬条件，因此都通过。`fields-missing` 虽然返回 success 关键词却未写文件，`fields-malformed` 写了非法 JSON，`fields-clobbered` 改坏了无关字段；三者均 fail，不能靠答案文字或 `success: true` 获得通过。
+
+完整 Criterion 延续 `id / type / target / params / mode / reason`：
+
+| type | target.field | params | 判断 |
+| --- | --- | --- | --- |
+| `equals` | JSON Pointer 或顶层字段名 | `{ "expected": 任意有限JSON值 }` | 对选中字段进行严格深相等比较 |
+| `json_parseable` | `""`（文档根） | `{}` | 产物存在、为普通文件且可解析为有限 JSON 值 |
+| `fields_preserved` | `""`（文档根） | `{ "baseline": 初始文档, "fields": ["/profile", "/enabled"] }` | 指定字段必须存在且与私有 baseline 深相等 |
+
+`target.artifact` 是 `artifact_allowlist` 内的单层 `.json` 输出文件名，不接受路径、目录或 `input.json`。`field` 的空串表示整个文档；`/items/0/name` 可查数组，`~1` 表示 `/`，`~0` 表示 `~`；裸字段名（如 E4a 的 `answer` 或 `a.b`）按一个顶层字面键处理，不做点号分割。只读自有属性，数组按非负标准索引访问。缺字段与值为 null 不同；类型和数组顺序必须相同，对象键顺序、空白和换行不影响判分。
+
+例如，更新主题并保持 profile：
+
+```json
+[
+  {
+    "id": "theme-updated", "type": "equals",
+    "target": { "artifact": "config.json", "field": "/theme" },
+    "params": { "expected": "dark" }, "mode": "hard",
+    "reason": "Theme must become dark."
+  },
+  {
+    "id": "profile-kept", "type": "fields_preserved",
+    "target": { "artifact": "config.json", "field": "" },
+    "params": { "baseline": { "theme": "light", "profile": { "owner": "Ada" } }, "fields": ["/profile"] },
+    "mode": "hard", "reason": "Do not modify the unrelated profile."
+  }
+]
+```
+
+保持检查的 baseline 由 case 作者独立写入私有 acceptance；它不是从当前输出或 Gold 自动推导，也不会新增到 AgentInput。作者应使它与公开初始状态的待保留值一致。只检查 `fields` 列出的值：选中对象会检查其整个子树，未选中的字段可变化或新增；需要禁止对象内新增字段时，应选中该对象。baseline 中缺少指定字段是配置错误（退出 2）。此检查不评估工具调用参数或执行过程中的副作用。
+
+本地 stub 的公开 fixture 可选 `files: { "config.json": "文件文本" }`，只把文本写到白名单产物中；不能覆盖 `answer.json` 或 stub 资源文件 `resource.json`。这支持重放合法、非法和缺失文件样例，不实现真实 adapter。旧 fixture 无需修改。
+
+verifier 在原有独立 worker 中只读 artifacts，同次验证缓存 JSON 解析结果，结果另存于 `cases/<id>/verifier/attempt-*/`。每条断言保留 `expected / actual / passed / evidence` 及 Criterion 元数据；保持检查的 expected/actual 是按字段路径投影的值。无法读取、解析或找到字段时，附加 `problem`，在终端、result.json、report.md 中可见；此时 actual 可为 null，必须结合 passed/problem 判断，不能把它当作真实 null 字段。
+
+硬断言失败决定 fail；diagnostic 失败只提供反馈。缺失或不可解析的被验收产物是断言 fail；worker 异常、超时、缺结果、无效结果仍是 `verifier_error`。原有 adapter 的 `answer.json` 响应协议仍先检查，缺失或破坏响应信封仍归 `agent_error`（protocol 阶段）。JSON 之外的格式、glob/目录、通用 JSON Schema、自动枚举所有无关字段不在 E4b 范围。
+
 ## 本波边界
 
-本波只在已有 E3a loader / E3b scaffold 上增加 E3c schema-only 校验与 AgentInput 防泄漏测试。借鉴 Harbor 的独立 verifier/产物分离与 Workbench 的需求→case→证据，不采用二者 runtime。不实现 E4+ 新 verifier、Gold/Oracle 校准、真实 adapter、baseline 对比、公共榜、云并行、线上 QQ 或默认 LLM judge。
+E4b 在已有 E4a Criterion 协议上增加结构化字段与 JSON 文件断言，沿用 E3c schema-only 校验和 AgentInput 隔离。借鉴 Harbor 的独立 verifier/产物分离与 Workbench 的需求→case→证据，不采用二者 runtime。不实现 E4c 工具参数/副作用、E5 Oracle、E6 seeds、真实 adapter、跨 run baseline 对比、公共榜、云并行、线上 QQ 或模型调用。
 
 本机验收是 macOS arm64；Linux 使用相同 POSIX 机制但尚未实机验证，Windows 不支持本波进程组清理。不可捕获的 SIGKILL/断电不保证最后一份报告已写完；已写入的证据保留。stub 进程隔离用于生命周期管理，不是执行不可信代码的安全沙箱。
 
@@ -211,3 +258,5 @@ pnpm eval --help
 - E3a：https://app.notion.com/p/405e1347ee97813e9172d527cf9a96e9
 - E3b：https://app.notion.com/p/405e1347ee9781cda55ce3b07a09388f
 - E3c：https://app.notion.com/p/405e1347ee97817c90f8f782dbfd8902
+
+- E4b：https://app.notion.com/p/405e1347ee9781a0b537f7e698d07323

@@ -20,5 +20,6 @@ if (mode === 'timeout') {
 if (mode === 'agent_error') { console.error('stub: injected agent crash'); process.exit(17); }
 if (mode === 'protocol_error') { writeFileSync('answer.json', '{broken protocol'); process.exit(0); }
 if (fixture.delay_ms) await new Promise(resolve => setTimeout(resolve, fixture.delay_ms));
+for (const [name, content] of Object.entries(fixture.files ?? {})) writeFileSync(name, content);
 writeFileSync('answer.json', JSON.stringify({ answer: fixture.answer, success: true }));
 console.log('stub: answer written');

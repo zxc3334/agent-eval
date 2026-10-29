@@ -1,4 +1,5 @@
 import type { Criterion } from './types.ts';
+import { projectFields, selectField, validField } from './json-fields.ts';
 
 export function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -21,35 +22,53 @@ export function assertJsonValue(value: unknown, field: string, ancestors = new S
   ancestors.delete(value);
 }
 
+export function criterionExpected(c: Criterion): unknown {
+  if (c.type === 'json_parseable') return true;
+  if (c.type === 'fields_preserved') return projectFields(c.params.baseline, c.params.fields);
+  return c.params.expected;
+}
+
 export function normalizeCriteria(value: unknown, source: string): Criterion[] {
   const bad = (field: string, message: string): never => {
-    throw new Error(`${source}: ${field}: ${message}; fix: supply unique id, type=equals, target={artifact:"answer.json",field:"answer"}, params={expected}, mode=hard|diagnostic and nonempty reason (or legacy {id,type,expected})`);
+    throw new Error(`${source}: ${field}: ${message}; fix: supply unique id, supported type, target={artifact:"output.json",field:"/path"}, type-specific params, mode=hard|diagnostic and nonempty reason (or legacy {id,type:"equals",expected})`);
   };
   if (!Array.isArray(value) || !value.length) return bad('criteria', 'expected nonempty array');
   const seen = new Set<string>();
-  return value.map((raw: unknown, i: number) => {
+  return value.map((input: unknown, i: number): Criterion => {
     const field = `criteria[${i}]`;
-    if (!record(raw) || typeof raw.id !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(raw.id) || seen.has(raw.id)) return bad(field, 'requires unique id using letters, digits, _ or -');
-    seen.add(raw.id);
-    if (raw.type !== 'equals') return bad(`${field}.type`, 'only equals is supported');
-    const legacy = !['target', 'params', 'mode', 'reason'].some(key => Object.hasOwn(raw, key));
-    let criterion: Criterion;
-    if (legacy) {
-      if (!Object.hasOwn(raw, 'expected')) return bad(`${field}.expected`, 'required');
-      criterion = { id: raw.id, type: 'equals', target: { artifact: 'answer.json', field: 'answer' },
-        params: { expected: raw.expected }, mode: 'hard', reason: 'Legacy equals: answer must deeply equal expected.' };
-    } else {
-      if (Object.hasOwn(raw, 'expected')) return bad(`${field}.expected`, 'use params.expected for the full protocol');
-      if (!record(raw.target) || raw.target.artifact !== 'answer.json' || raw.target.field !== 'answer'
-        || Object.keys(raw.target).length !== 2) return bad(`${field}.target`, 'only answer.json field answer is supported');
-      if (!record(raw.params) || !Object.hasOwn(raw.params, 'expected') || Object.keys(raw.params).length !== 1) return bad(`${field}.params`, 'requires only expected');
-      if (raw.mode !== 'hard' && raw.mode !== 'diagnostic') return bad(`${field}.mode`, 'expected hard or diagnostic');
-      if (typeof raw.reason !== 'string' || !raw.reason.trim()) return bad(`${field}.reason`, 'expected nonempty reason');
-      criterion = { id: raw.id, type: 'equals', target: { artifact: 'answer.json', field: 'answer' },
-        params: { expected: raw.params.expected }, mode: raw.mode, reason: raw.reason };
+    if (!record(input) || typeof input.id !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(input.id) || seen.has(input.id)) return bad(field, 'requires unique id using letters, digits, _ or -');
+    seen.add(input.id);
+    if (typeof input.type !== 'string' || !['equals', 'json_parseable', 'fields_preserved'].includes(input.type)) return bad(`${field}.type`, 'expected equals, json_parseable or fields_preserved');
+    const legacy = input.type === 'equals' && !['target', 'params', 'mode', 'reason'].some(key => Object.hasOwn(input, key));
+    if (legacy && !Object.hasOwn(input, 'expected')) return bad(`${field}.expected`, 'required');
+    const raw = legacy ? { id: input.id, type: 'equals', target: { artifact: 'answer.json', field: 'answer' },
+      params: { expected: input.expected }, mode: 'hard', reason: 'Legacy equals: answer must deeply equal expected.' } : input;
+    if (Object.hasOwn(raw, 'expected')) return bad(`${field}.expected`, 'use params.expected for the full protocol');
+    if (!record(raw.target) || typeof raw.target.artifact !== 'string'
+      || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*\.json$/.test(raw.target.artifact) || raw.target.artifact === 'input.json'
+      || !validField(raw.target.field) || Object.keys(raw.target).length !== 2) return bad(`${field}.target`, 'requires single JSON output filename and a JSON Pointer or top-level field name');
+    if (!record(raw.params)) return bad(`${field}.params`, 'expected object');
+    if (raw.mode !== 'hard' && raw.mode !== 'diagnostic') return bad(`${field}.mode`, 'expected hard or diagnostic');
+    if (typeof raw.reason !== 'string' || !raw.reason.trim()) return bad(`${field}.reason`, 'expected nonempty reason');
+    const base: Pick<Criterion, 'id' | 'target' | 'mode' | 'reason'> = { id: input.id, target: { artifact: raw.target.artifact, field: raw.target.field }, mode: raw.mode, reason: raw.reason };
+    try { assertJsonValue(raw.params, `${field}.params`); }
+    catch (error) { return bad(`${field}.params`, (error as Error).message); }
+    if (raw.type === 'equals') {
+      if (!Object.hasOwn(raw.params, 'expected') || Object.keys(raw.params).length !== 1) return bad(`${field}.params`, 'requires only expected');
+      return { ...base, type: 'equals', params: { expected: raw.params.expected } };
     }
-    try { assertJsonValue(criterion.params.expected, `${field}.params.expected`); }
-    catch (error) { return bad(`${field}.params.expected`, (error as Error).message); }
-    return criterion;
+    if (raw.target.field !== '') return bad(`${field}.target.field`, 'file assertions require the document root (empty string)');
+    if (raw.type === 'json_parseable') {
+      if (Object.keys(raw.params).length !== 0) return bad(`${field}.params`, 'json_parseable requires empty params');
+      return { ...base, type: 'json_parseable', params: {} };
+    }
+    const { baseline, fields } = raw.params;
+    if (!Object.hasOwn(raw.params, 'baseline') || Object.keys(raw.params).length !== 2
+      || !Array.isArray(fields) || !fields.length || fields.some(f => !validField(f))
+      || new Set(fields).size !== fields.length) return bad(`${field}.params`, 'fields_preserved requires baseline and nonempty unique fields');
+    for (const path of fields) {
+      if (!selectField(baseline, path).found) return bad(`${field}.params.baseline`, `preserved field ${JSON.stringify(path)} is missing`);
+    }
+    return { ...base, type: 'fields_preserved', params: { baseline, fields } };
   });
 }

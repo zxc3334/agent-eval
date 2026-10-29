@@ -93,17 +93,24 @@ export function loadCase(casesDir: string, suite: string, ref: CaseRef): LoadedC
   const fixture = readJson(fixtureFile);
   if (!object(fixture) || !Object.hasOwn(fixture, 'answer')) throw new Error(`${fixtureFile}: answer: required; fix: add a public stub answer`);
   if (fixture.delay_ms !== undefined && (!Number.isInteger(fixture.delay_ms) || (fixture.delay_ms as number) < 0 || (fixture.delay_ms as number) > 300000)) throw new Error(`${fixtureFile}: delay_ms: expected integer 0..300000; fix: set an integer in range or omit delay_ms`);
+  if (fixture.files !== undefined && (!object(fixture.files) || Object.entries(fixture.files).some(([name, content]) =>
+    !raw.artifact_allowlist.includes(name) || ['answer.json', 'resource.json'].includes(name) || typeof content !== 'string'))) {
+    throw new Error(`${fixtureFile}: files: expected output filename to text mapping; fix: use allowlisted filenames other than answer.json/resource.json and string contents`);
+  }
   const initialState = readJson(publicFile('initial_state'));
   if (!object(initialState)) bad('initial_state', 'expected JSON object');
   const acceptance = readJson(acceptanceFile);
-  normalizeCriteria(acceptance?.criteria, acceptanceFile);
+  const criteria = normalizeCriteria(acceptance?.criteria, acceptanceFile);
+  for (const [i, criterion] of criteria.entries()) {
+    if (!raw.artifact_allowlist.includes(criterion.target.artifact)) throw new Error(`${acceptanceFile}: criteria[${i}].target.artifact: not in artifact_allowlist; fix: allowlist ${criterion.target.artifact} in case.json`);
+  }
   if (!object(acceptance.gold) || !Object.hasOwn(acceptance.gold, 'answer')) throw new Error(`${acceptanceFile}: gold.answer: required; fix: add the private gold answer`);
   if (!Array.isArray(acceptance.error_examples) || acceptance.error_examples.some((example: any) => !object(example) || !Object.hasOwn(example, 'answer') || typeof example.reason !== 'string' || !example.reason.trim())) throw new Error(`${acceptanceFile}: error_examples: expected array of { answer, reason }; fix: provide counterexamples with an answer and nonempty reason, or []`);
   if (typeof acceptance.reviewed !== 'boolean') throw new Error(`${acceptanceFile}: reviewed: expected boolean; fix: set true or false`);
   // Explicit projection is the public/private boundary; no case/acceptance/experiment spread.
   const input: AgentInput = {
     prompt: publicInput.prompt,
-    fixture: { answer: fixture.answer, ...(fixture.delay_ms === undefined ? {} : { delay_ms: fixture.delay_ms as number }) },
+    fixture: { answer: fixture.answer, ...(fixture.files === undefined ? {} : { files: fixture.files as Record<string, string> }), ...(fixture.delay_ms === undefined ? {} : { delay_ms: fixture.delay_ms as number }) },
     initial_state: initialState,
     artifact_allowlist: [...raw.artifact_allowlist],
     budgets: { timeout_ms: raw.budgets.timeout_ms, max_steps: raw.budgets.max_steps },

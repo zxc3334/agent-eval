@@ -1,0 +1,6 @@
+{
+  "answer": "success: updated configuration to dark",
+  "files": {
+    "config.json": "{\"theme\":\"dark\","
+  }
+}

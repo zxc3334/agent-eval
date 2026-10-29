@@ -1,0 +1,14 @@
+{
+  "config": {
+    "theme": "light",
+    "profile": {
+      "owner": "Ada",
+      "labels": [
+        "local",
+        "demo"
+      ]
+    },
+    "enabled": false,
+    "nullable": null
+  }
+}
