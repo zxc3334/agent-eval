@@ -41,6 +41,8 @@ export function loadCase(casesDir: string, suite: string, ref: CaseRef): LoadedC
   const bad = (field: string, message: string): never => { throw new Error(`${file}: ${field}: ${message}`); };
   if (raw?.schema_version !== 2) bad('schema_version', 'expected 2; migrate v1 case');
   if (raw.id !== ref.id) bad('id', `expected ${ref.id}`);
+  if (raw.requirement_id !== undefined) identifier(raw.requirement_id, `${file}: requirement_id`);
+  if (raw.brief !== undefined && !readFileSync(localFile(dirname(file), raw.brief, 'brief'), 'utf8').trim()) bad('brief', 'expected nonempty document');
   exactVersion(ref.version, `${file}: suite version`);
   exactVersion(raw.version, `${file}: version`);
   if (raw.version !== ref.version) bad('version', `suite pins ${ref.version}, found ${raw.version}`);

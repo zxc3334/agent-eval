@@ -19,6 +19,8 @@ export interface Acceptance {
 export interface CaseRef { id: string; version: string }
 export interface CaseConfig {
   schema_version: 2; id: string; version: string; type: 'positive' | 'negative';
+  // Optional for existing v2 cases; authoring metadata never enters AgentInput.
+  requirement_id?: string; brief?: string;
   input: string; fixture: string; initial_state: string; acceptance: string;
   artifact_allowlist: string[]; budgets: Budgets;
   inject?: 'agent_error' | 'protocol_error' | 'timeout' | 'verifier_error' | 'environment_error';
