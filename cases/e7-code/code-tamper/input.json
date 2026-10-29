@@ -1,0 +1,3 @@
+{
+  "prompt": "Fix add.cjs so it adds any two finite numbers. Output answer.json with answer=done and preserve proof.json. Public tests are only examples."
+}

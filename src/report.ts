@@ -29,13 +29,16 @@ export function generateReport(dir: string) {
   };
   json(join(dir, 'summary.json'), summary);
   const pct = (v: number | null) => v === null ? 'N/A' : `${(v * 100).toFixed(1)}%`;
-  const lines = [`# Run ${config.run_id}`, '', `> ${LOCAL_EVALUATION_NOTICE}`, '', `Agent: ${config.agent} (${config.agent === 'oracle' ? 'local reference solution' : 'local stub'}; not jackson-bot)`, `Configuration: ${config.config_source}`, `Source run: ${config.source_run_id ?? 'none'}`, '',
+  const lines = [`# Run ${config.run_id}`, '', `> ${LOCAL_EVALUATION_NOTICE}`, '', `Agent: ${config.agent} (${config.agent === 'oracle' ? 'local reference solution' : config.agent === 'container' ? 'local scripted container fixture' : 'local stub'}; not jackson-bot)`, `Configuration: ${config.config_source}`, `Source run: ${config.source_run_id ?? 'none'}`, '',
     `Attempted: ${attempted}/${config.case_ids.length}; scored: ${scored}`, `All-attempt pass rate: ${pct(summary.pass_rate)} (pass / attempted)`, `Scoring coverage: ${pct(summary.scoring_coverage)} ((pass + fail) / attempted)`,
     `Counts: ${JSON.stringify(counts)}`, `Not attempted: ${notAttempted.join(', ') || 'none'}`, `Interrupted: ${summary.interrupted}; exit code: ${code}`, ''];
   if (state.error) lines.push(`Run error: ${state.error}`, '');
   for (const r of results) {
     lines.push(`## ${r.case_id}: ${r.status} (${r.duration_ms}ms)`, '', `Events: ${r.events}`, '');
     if (r.reason) lines.push(`Stage: ${r.stage}; reason: ${r.reason}`, '');
+    lines.push(`Isolation: ${r.isolation ?? 'trusted-local'}${r.isolation === 'docker' ? '' : ' (no security sandbox)'}; session: ${r.session_id ?? 'legacy'}`, '');
+    if (r.artifact_manifest) lines.push(`Artifact manifest: ${r.artifact_manifest}`, '');
+    for (const error of r.handoff_errors ?? []) lines.push(`Handoff diagnostic: ${error}`, '');
     if (r.verifier_result_dir) lines.push(`Verifier result: ${r.verifier_result_dir}`, '');
     for (const a of r.assertions) lines.push(`- ${a.criterion_id} [${a.mode ?? 'hard'}]: ${a.passed ? 'pass' : 'fail'}; expected=${JSON.stringify(a.expected)}; actual=${JSON.stringify(a.actual)}; artifact: ${a.artifact}${a.reason ? `; reason: ${a.reason}; target=${JSON.stringify(a.target)}; params=${JSON.stringify(a.params)}; evidence=${JSON.stringify(a.evidence)}${a.problem ? `; problem: ${a.problem}` : ''}` : ''}`);
     lines.push('');
