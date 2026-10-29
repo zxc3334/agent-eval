@@ -73,10 +73,13 @@ export interface Result {
   stage?: string; reason?: string; events: string; verifier_result_dir?: string;
   session_id?: string; isolation?: 'trusted-local' | 'docker'; artifact_manifest?: string; handoff_errors?: string[];
   agent_started?: boolean;
+  trial?: number; steps_used?: number | null; stop_reason?: string;
+  usage?: { input_tokens?: number; output_tokens?: number; cost?: number };
 }
 export interface Options {
   suite: string; agent: string; casesDir: string; runsDir: string; caseId?: string;
   failedFrom?: string; watch: boolean; failFast: boolean;
   selectedIds?: string[]; sourceRunId?: string;
   experimentFile: string;
+  repeat?: number; rerunSource?: string;
 }

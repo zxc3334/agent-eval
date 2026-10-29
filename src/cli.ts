@@ -9,6 +9,7 @@ import { createCase } from './scaffold.ts';
 import { validateSchema } from './validation.ts';
 import { validateSuite } from './calibration.ts';
 import { generateCalibrationReport } from './calibration-report.ts';
+import { writeManifest } from './manifest.ts';
 import type { Options } from './types.ts';
 
 try {
@@ -19,11 +20,12 @@ try {
     requirement: { type: 'string' },
     'schema-only': { type: 'boolean', default: false },
     'runs-dir': { type: 'string', default: 'runs' }, 'failed-from': { type: 'string' },
+    rerun: { type: 'string' }, repeat: { type: 'string' },
     'fail-fast': { type: 'boolean', default: false }, watch: { type: 'boolean', default: false },
     help: { type: 'boolean', default: false },
   } });
   if (values.help) {
-    console.log('Usage: pnpm eval [--suite smoke] [--agent stub|oracle|container|jackson-bot-pi] [--experiment <json>] [--case <id> | --failed-from <run-id>] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\n       pnpm eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --schema-only [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --suite <name> [--cases-dir <path>] [--runs-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=success/all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
+    console.log('Usage: pnpm eval [--suite smoke] [--agent stub|oracle|container|jackson-bot-pi] [--experiment <json>] [--case <id> | --failed-from <run-id> | --rerun <run-id>] [--repeat N] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\n       pnpm eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --schema-only [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --suite <name> [--cases-dir <path>] [--runs-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=success/all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
   } else if (positionals[0] === 'validate') {
     if (positionals.length !== 1 || (!values['schema-only'] && !values.suite)) throw new Error('usage: eval validate --suite <name> [--schema-only] [--cases-dir <path>] [--runs-dir <path>]');
     const allowed = values['schema-only'] ? ['schema-only', 'suite', 'cases-dir'] : ['suite', 'cases-dir', 'runs-dir'];
@@ -57,22 +59,27 @@ try {
   } else if (positionals[0] === 'report' && positionals.length === 2) {
     const dir = resolve(values['runs-dir']!, identifier(positionals[1], 'run-id'));
     if (readJson(join(dir, 'config.json')).kind === 'calibration') generateCalibrationReport(dir);
-    else generateReport(dir);
+    else {
+      generateReport(dir);
+      if (existsSync(join(dir, 'manifest.json'))) writeManifest(dir, readJson(join(dir, 'manifest.json')));
+    }
     console.log(`Report: ${dir}/report.md`);
   } else {
     if (positionals.length) throw new Error('usage: eval [options] | eval report <run-id> | eval case new <id> --requirement <id>');
     if (values.agent !== undefined && !['stub', 'oracle', 'container', 'jackson-bot-pi'].includes(values.agent)) throw new Error('agent: only stub, oracle, container and jackson-bot-pi are supported');
-    if (values.case && values['failed-from']) throw new Error('case and failed-from are mutually exclusive');
+    if ([values.case, values['failed-from'], values.rerun].filter(Boolean).length > 1) throw new Error('case, failed-from and rerun are mutually exclusive');
+    if (values.repeat !== undefined && (!/^[1-9]\d*$/.test(values.repeat) || !Number.isSafeInteger(Number(values.repeat)))) throw new Error('repeat: expected positive safe integer');
     const runsDir = resolve(values['runs-dir']!);
     let source: any; let selectedIds: string[] | undefined;
-    const sourceRunId = values['failed-from'] ? identifier(values['failed-from'], 'failed-from') : undefined;
+    const sourceRunId = values['failed-from'] || values.rerun ? identifier((values['failed-from'] ?? values.rerun)!, 'source run') : undefined;
     if (sourceRunId) {
       const sourceDir = join(runsDir, sourceRunId);
       source = readJson(join(sourceDir, 'config.json'));
-      selectedIds = source.case_ids.filter((id: string) => {
+      if (values['failed-from'] && !existsSync(join(sourceDir, 'manifest.json'))) console.log('Source run has no manifest; reproducibility comparison is unavailable.');
+      selectedIds = values.rerun ? source.case_ids : source.case_ids.filter((id: string) => {
         identifier(id, 'source case');
-        const file = join(sourceDir, 'cases', id, 'result.json');
-        return !existsSync(file) || readJson(file).status !== 'pass';
+        const files = (source.repeat ?? 1) > 1 ? Array.from({ length: source.repeat }, (_, i) => join(sourceDir, 'cases', id, 'trials', String(i + 1), 'result.json')) : [join(sourceDir, 'cases', id, 'result.json')];
+        return files.some(file => !existsSync(file) || readJson(file).status !== 'pass');
       });
     }
     const agent = values.agent ?? source?.agent ?? 'stub';
@@ -81,7 +88,9 @@ try {
       caseId: values.case ? identifier(values.case, 'case') : undefined,
       casesDir: resolve(values['cases-dir'] ?? source?.cases_dir ?? 'cases'), runsDir,
       experimentFile: resolve(values.experiment ?? (source?.agent === agent ? source?.experiment_file : undefined) ?? `experiments/${agent}.json`),
-      watch: values.watch!, failFast: values['fail-fast']!, selectedIds, sourceRunId,
+      watch: values.watch!, failFast: values['fail-fast'] || (values.rerun ? source?.fail_fast ?? false : false), selectedIds, sourceRunId,
+      repeat: values.repeat === undefined ? (values.rerun ? source?.repeat ?? 1 : 1) : Number(values.repeat),
+      rerunSource: sourceRunId && (values.rerun || existsSync(join(runsDir, sourceRunId, 'manifest.json'))) ? sourceRunId : undefined,
     };
     if (options.runsDir === options.casesDir || options.runsDir === join(options.casesDir, options.suite)
       || existsSync(join(options.runsDir, 'case.json')) || existsSync(join(options.runsDir, 'suite.json'))) {
