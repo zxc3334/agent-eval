@@ -107,6 +107,37 @@ export interface Result {
   trial?: number; steps_used?: number | null; stop_reason?: string;
   usage?: { input_tokens?: number; output_tokens?: number; cost?: number };
 }
+export interface LoadedSkill {
+  name: string;
+  description: string;
+  body: string;
+  path: string;
+  version?: string;
+}
+export interface SkillMatrixConfig {
+  sut: { name: string; path: string; version?: string };
+  baseline?: { name: string; path?: string } | null;
+  suite: string;
+  models?: string[];
+  cases_dir?: string;
+  runs_dir?: string;
+}
+export interface SkillMatrixComparison {
+  case_id: string;
+  baseline_status: Status | 'unattempted';
+  candidate_status: Status;
+  classification: 'improve' | 'regress' | 'flat' | 'error';
+}
+export interface SkillMatrixReport {
+  skill: string;
+  suite: string;
+  total_cases: number;
+  improved: number;
+  regressed: number;
+  unchanged: number;
+  win_rate: number;
+  cases: SkillMatrixComparison[];
+}
 export interface Options {
   suite: string; agent: string; casesDir: string; runsDir: string; caseId?: string;
   failedFrom?: string; watch: boolean; failFast: boolean;
@@ -114,4 +145,5 @@ export interface Options {
   experimentFile: string;
   repeat?: number; rerunSource?: string;
   traceFile?: string;
+  skill?: string;
 }

@@ -16,7 +16,7 @@ import type { GoldSource } from './oracle.ts';
 import type { DockerCommand } from './container.ts';
 import type { ErrorExample, LoadedCase, Result, ExperimentConfig } from './types.ts';
 
-export async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal, gold?: GoldSource, counterexample?: ErrorExample, executionMode = 'stub', docker: DockerCommand = dockerCommand, experiment?: ExperimentConfig, trial?: number): Promise<Result> {
+export async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal, gold?: GoldSource, counterexample?: ErrorExample, executionMode = 'stub', docker: DockerCommand = dockerCommand, experiment?: ExperimentConfig, trial?: number, skillPath?: string): Promise<Result> {
   const start = performance.now(); const caseDir = trial === undefined ? join(dir, 'cases', c.config.id) : join(dir, 'cases', c.config.id, 'trials', String(trial));
   const workspace = join(caseDir, 'workspace'); const artifacts = join(caseDir, 'artifacts');
   mkdirSync(caseDir, { recursive: true });
@@ -40,6 +40,10 @@ export async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal, 
     result.isolation = executor === 'container' ? 'docker' : 'trusted-local';
     json(join(caseDir, 'session.json'), { ...session, isolation: result.isolation });
     json(join(workspace, 'session.json'), { ...session, isolation: result.isolation });
+    if (skillPath) {
+      const { loadSkill, injectSkill } = await import('./skill.ts');
+      injectSkill(loadSkill(skillPath), workspace, 'full');
+    }
     if (!!c.config.execution !== (executor === 'container')) throw new Error('container cases require --agent container; container execution requires case.execution (trusted stub/oracle never execute shell tasks)');
     let image: string | undefined;
     if (executor === 'container') {

@@ -60,7 +60,7 @@ export async function run(options: Options, signal: AbortSignal = new AbortContr
     outer: for (const [index, c] of cases.entries()) {
       for (let trial = 1; trial <= repeat; trial++) {
       if (signal.aborted) break outer;
-      const result = await evaluate(c, dir, signal, golds[index], undefined, options.agent, undefined, experiment, repeat > 1 ? trial : undefined);
+      const result = await evaluate(c, dir, signal, golds[index], undefined, options.agent, undefined, experiment, repeat > 1 ? trial : undefined, options.skill);
       console.log(`${result.status.toUpperCase()} ${result.case_id} ${result.duration_ms}ms`);
       for (const a of result.assertions.filter(a => !a.passed)) console.log(`  ${a.criterion_id} [${a.mode}]: expected=${JSON.stringify(a.expected)} actual=${JSON.stringify(a.actual)}\n  reason: ${a.reason}${a.problem ? `\n  problem: ${a.problem}` : ''}\n  artifact: ${a.artifact}`);
       for (const error of result.handoff_errors ?? []) console.log(`  ${error}; see ${result.artifact_manifest}`);

@@ -19,6 +19,7 @@ try {
     case: { type: 'string' }, 'cases-dir': { type: 'string' },
     experiment: { type: 'string' }, 'experiment-record': { type: 'string' }, vary: { type: 'string', multiple: true },
     requirement: { type: 'string' }, 'from-run': { type: 'string' }, 'from-trace': { type: 'string' }, trace: { type: 'string' },
+    skill: { type: 'string' },
     'schema-only': { type: 'boolean', default: false },
     'runs-dir': { type: 'string', default: 'runs' }, 'failed-from': { type: 'string' },
     rerun: { type: 'string' }, repeat: { type: 'string' },
@@ -27,6 +28,15 @@ try {
   } });
   if (values.help) {
     console.log('Usage: pnpm eval [--suite smoke] [--agent stub|oracle|container|jackson-bot-pi] [--experiment <json>] [--case <id> | --failed-from <run-id> | --rerun <run-id>] [--repeat N] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\n       pnpm eval baseline set <run-id> [--runs-dir <path>]\n       pnpm eval compare <baseline-run> <candidate-run> [--vary model|prompt|product_revision] [--experiment-record <path>] [--runs-dir <path>]\n       pnpm eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]\n       pnpm eval case new <id> --from-run <run-id> --case <source-id> [--suite smoke] [--cases-dir <path>] [--runs-dir <path>]\n       pnpm eval validate --schema-only [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --suite <name> [--cases-dir <path>] [--runs-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=success/all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
+  } else if (positionals[0] === 'skill-matrix') {
+    if (positionals.length !== 2) throw new Error('usage: eval skill-matrix <config-json> [--runs-dir <path>]');
+    const { runSkillMatrix } = await import('./skill.ts');
+    const cfg = readJson(resolve(positionals[1]));
+    const report = await runSkillMatrix(cfg, resolve(values['runs-dir'] ?? 'runs'));
+    console.log(`Skill Matrix: ${report.skill} on suite ${report.suite}`);
+    console.log(`Cases: ${report.total_cases}; Improved: ${report.improved}, Regressed: ${report.regressed}, Unchanged: ${report.unchanged}`);
+    console.log(`Win rate: ${(report.win_rate * 100).toFixed(0)}%`);
+    for (const c of report.cases) console.log(`  ${c.case_id}: ${c.classification} (base: ${c.baseline_status} -> cand: ${c.candidate_status})`);
   } else if (positionals[0] === 'baseline') {
     if (positionals.length !== 3 || positionals[1] !== 'set') throw new Error('usage: eval baseline set <run-id> [--runs-dir <path>]');
     for (const token of tokens) {
@@ -143,6 +153,7 @@ try {
       repeat: values.repeat === undefined ? (values.rerun ? source?.repeat ?? 1 : 1) : Number(values.repeat),
       rerunSource: sourceRunId && (values.rerun || existsSync(join(runsDir, sourceRunId, 'manifest.json'))) ? sourceRunId : undefined,
       traceFile: values.trace ? resolve(values.trace) : undefined,
+      skill: values.skill ? resolve(values.skill) : undefined,
     };
     if (options.runsDir === options.casesDir || options.runsDir === join(options.casesDir, options.suite)
       || existsSync(join(options.runsDir, 'case.json')) || existsSync(join(options.runsDir, 'suite.json'))) {
