@@ -16,9 +16,13 @@ export type Criterion = CriterionBase & (
   | { type: 'call_after'; params: { prerequisite: string; successor: string } }
   | { type: 'error_recovery'; params: { failing_tool: string; recovery_tool: string } }
   | { type: 'budget_limit'; params: { max_tool_calls?: number } }
+  | { type: 'skill_activated'; params: { skill_name: string } }
+  | { type: 'skill_avoided'; params: { skill_name: string } }
+  | { type: 'runbook_adherence'; params: { required_steps: string[] } }
 );
 export type ToolCriterion = Extract<Criterion, {
-  type: 'tool_args' | 'no_write' | 'no_duplicate_side_effects' | 'call_sequence' | 'call_after' | 'error_recovery' | 'budget_limit';
+  type: 'tool_args' | 'no_write' | 'no_duplicate_side_effects' | 'call_sequence' | 'call_after' | 'error_recovery' | 'budget_limit'
+    | 'skill_activated' | 'skill_avoided' | 'runbook_adherence';
 }>;
 // One entry per attempted invocation; outcome/id metadata does not erase an attempt.
 export interface ToolCall { tool: string; arguments: Record<string, unknown>; error?: string; result?: unknown }
@@ -53,8 +57,12 @@ export interface ContainerExecution {
   image: string; command: string[]; public_files: Record<string, string>;
   private_tests: string; verifier_command: string[];
 }
+export type SkillIntent = 'trigger_positive' | 'trigger_negative' | 'adherence_check';
+
 export interface CaseConfig {
   schema_version: 2; id: string; version: string; type: 'positive' | 'negative';
+  skill_intent?: SkillIntent;
+  target_skill?: string;
   // Optional for existing v2 cases; authoring metadata never enters AgentInput.
   requirement_id?: string; brief?: string;
   source_evidence?: { run_id: string; case_id: string; result: string };
@@ -137,6 +145,18 @@ export interface SkillMatrixReport {
   unchanged: number;
   win_rate: number;
   cases: SkillMatrixComparison[];
+}
+export interface SkillMetrics {
+  skill_name: string;
+  confusion_matrix: {
+    true_positives: number;
+    false_positives: number;
+    true_negatives: number;
+    false_negatives: number;
+  };
+  trigger_precision: number | null;
+  trigger_recall: number | null;
+  adherence_score: number | null;
 }
 export interface Options {
   suite: string; agent: string; casesDir: string; runsDir: string; caseId?: string;

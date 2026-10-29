@@ -30,6 +30,9 @@ export function criterionExpected(c: Criterion): unknown {
   if (c.type === 'call_after') return { prerequisite: c.params.prerequisite, successor: c.params.successor };
   if (c.type === 'error_recovery') return { failing_tool: c.params.failing_tool, recovery_tool: c.params.recovery_tool };
   if (c.type === 'budget_limit') return c.params.max_tool_calls ?? null;
+  if (c.type === 'skill_activated') return { skill_name: c.params.skill_name, activated: true };
+  if (c.type === 'skill_avoided') return { skill_name: c.params.skill_name, activated: false };
+  if (c.type === 'runbook_adherence') return c.params.required_steps;
   return c.params.expected;
 }
 
@@ -43,8 +46,8 @@ export function normalizeCriteria(value: unknown, source: string): Criterion[] {
     const field = `criteria[${i}]`;
     if (!record(input) || typeof input.id !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(input.id) || seen.has(input.id)) return bad(field, 'requires unique id using letters, digits, _ or -');
     seen.add(input.id);
-    if (typeof input.type !== 'string' || !['equals', 'json_parseable', 'fields_preserved', 'tool_args', 'no_write', 'no_duplicate_side_effects', 'call_sequence', 'call_after', 'error_recovery', 'budget_limit'].includes(input.type)) {
-      return bad(`${field}.type`, 'expected equals, json_parseable, fields_preserved, tool_args, no_write, no_duplicate_side_effects, call_sequence, call_after, error_recovery or budget_limit');
+    if (typeof input.type !== 'string' || !['equals', 'json_parseable', 'fields_preserved', 'tool_args', 'no_write', 'no_duplicate_side_effects', 'call_sequence', 'call_after', 'error_recovery', 'budget_limit', 'skill_activated', 'skill_avoided', 'runbook_adherence'].includes(input.type)) {
+      return bad(`${field}.type`, 'expected equals, json_parseable, fields_preserved, tool_args, no_write, no_duplicate_side_effects, call_sequence, call_after, error_recovery, budget_limit, skill_activated, skill_avoided or runbook_adherence');
     }
     const legacy = input.type === 'equals' && !['target', 'params', 'mode', 'reason'].some(key => Object.hasOwn(input, key));
     if (legacy && !Object.hasOwn(input, 'expected')) return bad(`${field}.expected`, 'required');
@@ -111,6 +114,20 @@ export function normalizeCriteria(value: unknown, source: string): Criterion[] {
         return bad(`${field}.params`, 'budget_limit requires non-negative integer max_tool_calls');
       }
       return { ...base, type: 'budget_limit', params: { ...(typeof max === 'number' ? { max_tool_calls: max } : {}) } };
+    }
+    if (raw.type === 'skill_activated' || raw.type === 'skill_avoided') {
+      const name = raw.params.skill_name;
+      if (typeof name !== 'string' || !name.trim()) {
+        return bad(`${field}.params`, `${raw.type} requires nonempty skill_name`);
+      }
+      return { ...base, type: raw.type, params: { skill_name: name } };
+    }
+    if (raw.type === 'runbook_adherence') {
+      const steps = raw.params.required_steps;
+      if (!Array.isArray(steps) || !steps.length || steps.some(s => typeof s !== 'string' || !s.trim())) {
+        return bad(`${field}.params`, 'runbook_adherence requires nonempty array of required_steps');
+      }
+      return { ...base, type: 'runbook_adherence', params: { required_steps: steps } };
     }
     if (raw.target.field !== '') return bad(`${field}.target.field`, 'file assertions require the document root (empty string)');
     if (raw.type === 'json_parseable') {

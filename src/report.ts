@@ -32,6 +32,36 @@ export function generateReport(dir: string) {
   const missingAttempts = attempts.filter(a => !a.result).map(a => ({ case_id: a.id, trial: a.trial }));
   const code = state.interrupted || state.error || attempted > scored ? 2 : counts.fail ? 1 : 0;
   const coverage = requirementCoverage(dir, config);
+  const cases: any[] = Array.isArray(config.cases) ? config.cases : [];
+  const intentCases = cases.filter(c => c?.config?.skill_intent);
+  let skill_metrics: any = null;
+  if (intentCases.length) {
+    let tp = 0; let fp = 0; let tn = 0; let fn = 0;
+    let adherenceTotal = 0; let adherencePassed = 0;
+    for (const c of intentCases) {
+      const id = c.config.id;
+      const r = results.find(item => item.case_id === id);
+      if (!r) continue;
+      const intent = c.config.skill_intent;
+      if (intent === 'trigger_positive') {
+        if (r.status === 'pass') tp++;
+        else fn++;
+      } else if (intent === 'trigger_negative') {
+        if (r.status === 'pass') tn++;
+        else fp++;
+      } else if (intent === 'adherence_check') {
+        adherenceTotal++;
+        if (r.status === 'pass') adherencePassed++;
+      }
+    }
+    skill_metrics = {
+      skill_name: intentCases[0]?.config?.target_skill ?? 'default-skill',
+      confusion_matrix: { true_positives: tp, false_positives: fp, true_negatives: tn, false_negatives: fn },
+      trigger_precision: (tp + fp) > 0 ? tp / (tp + fp) : null,
+      trigger_recall: (tp + fn) > 0 ? tp / (tp + fn) : null,
+      adherence_score: adherenceTotal > 0 ? adherencePassed / adherenceTotal : null,
+    };
+  }
   const attempt_evidence = attempts.map(a => {
     const base = repeat === 1 ? `cases/${a.id}` : `cases/${a.id}/trials/${a.trial}`;
     const path = (name: string) => existsSync(join(dir, base, name)) ? `${base}/${name}` : null;
@@ -46,6 +76,7 @@ export function generateReport(dir: string) {
     pass_rate: attempted ? counts.pass / attempted : null,
     scoring_coverage: attempted ? scored / attempted : null,
     counts, not_attempted: notAttempted, interrupted: !!state.interrupted, error: state.error ?? null, exit_code: code,
+    ...(skill_metrics ? { skill_metrics } : {}),
   };
   json(join(dir, 'summary.json'), summary);
   const pct = (v: number | null) => v === null ? 'N/A' : `${(v * 100).toFixed(1)}%`;
@@ -55,6 +86,20 @@ export function generateReport(dir: string) {
   const lines = [`# Run ${config.run_id}`, '', `> ${scopeNote}`, '', `Agent: ${config.agent} (${agentDescription})`, `Configuration: ${config.config_source}`, `Source run: ${config.source_run_id ?? 'none'}`, '',
     `Attempted: ${attempted}/${summary.planned}; scored: ${scored}`, `All-attempt pass rate: ${pct(summary.pass_rate)} (pass / attempted)`, `Scoring coverage: ${pct(summary.scoring_coverage)} ((pass + fail) / attempted)`,
     `Counts: ${JSON.stringify(counts)}`, `Not attempted: ${notAttempted.join(', ') || 'none'}`, `Interrupted: ${summary.interrupted}; exit code: ${code}`, ''];
+  if (skill_metrics) {
+    lines.push('## Skill Intent & Adherence Metrics', '');
+    lines.push(`Skill: ${skill_metrics.skill_name}`, '');
+    lines.push('| Metric | Value |');
+    lines.push('| --- | --- |');
+    lines.push(`| True Positives (TP) | ${skill_metrics.confusion_matrix.true_positives} |`);
+    lines.push(`| False Positives (FP) | ${skill_metrics.confusion_matrix.false_positives} |`);
+    lines.push(`| True Negatives (TN) | ${skill_metrics.confusion_matrix.true_negatives} |`);
+    lines.push(`| False Negatives (FN) | ${skill_metrics.confusion_matrix.false_negatives} |`);
+    lines.push(`| Trigger Precision | ${pct(skill_metrics.trigger_precision)} |`);
+    lines.push(`| Trigger Recall | ${pct(skill_metrics.trigger_recall)} |`);
+    lines.push(`| Runbook Adherence | ${pct(skill_metrics.adherence_score)} |`);
+    lines.push('');
+  }
   lines.push(`Configuration snapshot: ${localLink('config.json', 'config.json')}`, ...(existsSync(join(dir, 'manifest.json')) ? [`Manifest: ${localLink('manifest.json', 'manifest.json')}`] : []), `Rerun: ${rerun}`, 'Model output is not guaranteed to be identical on rerun.', '', '## Requirement coverage', '');
   for (const c of coverage.requirement_coverage) lines.push(`- ${c.requirement_id}: ${c.covered ? (c.scored ? 'covered and scored' : 'attempted, not scored') : 'uncovered'}; cases: ${c.case_ids.join(', ')}; not attempted: ${c.uncovered_case_ids.join(', ') || 'none'}; not scored: ${c.unscored_case_ids.join(', ') || 'none'}; ${c.evidence.map(p => localLink(p, 'result')).join(', ') || 'no evidence'}`);
   if (!coverage.requirement_coverage.length) lines.push('- No requirement mappings recorded.');

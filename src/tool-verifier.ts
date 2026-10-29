@@ -107,6 +107,43 @@ export function evaluateToolCalls(c: ToolCriterion, value: unknown): ToolEvaluat
       ...(passed ? {} : { problem: `exceeded max_tool_calls: limit was ${max}, actual was ${calls.length}` }),
     };
   }
+  if (c.type === 'skill_activated') {
+    const target = c.params.skill_name.toLowerCase();
+    const activated = calls.some(item =>
+      item.tool.toLowerCase().includes(target) ||
+      String(item.arguments.skill ?? '').toLowerCase() === target ||
+      String(item.arguments.name ?? '').toLowerCase() === target
+    );
+    return {
+      actual: { skill_name: c.params.skill_name, activated },
+      passed: activated,
+      ...(activated ? {} : { problem: `expected skill ${c.params.skill_name} to be activated, but no related tool call was detected` }),
+    };
+  }
+  if (c.type === 'skill_avoided') {
+    const target = c.params.skill_name.toLowerCase();
+    const found = calls.filter(item =>
+      item.tool.toLowerCase().includes(target) ||
+      String(item.arguments.skill ?? '').toLowerCase() === target ||
+      String(item.arguments.name ?? '').toLowerCase() === target
+    );
+    const passed = found.length === 0;
+    return {
+      actual: { skill_name: c.params.skill_name, activated: !passed },
+      passed,
+      ...(passed ? {} : { problem: `skill ${c.params.skill_name} was unexpectedly activated on negative/distractor case (false positive)` }),
+    };
+  }
+  if (c.type === 'runbook_adherence') {
+    const invoked = new Set(calls.map(item => item.tool));
+    const missing = c.params.required_steps.filter(step => !invoked.has(step));
+    const passed = missing.length === 0;
+    return {
+      actual: calls.map(item => item.tool),
+      passed,
+      ...(passed ? {} : { problem: `unmet runbook steps from SKILL.md: ${missing.join(', ')}` }),
+    };
+  }
   const seen: { index: number; call: ToolCall }[] = [];
   const actual: { index: number; first_index: number; tool: string; arguments: Record<string, unknown> }[] = [];
   for (const [index, call] of calls.entries()) {

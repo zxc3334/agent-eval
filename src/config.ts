@@ -87,6 +87,8 @@ export function loadCase(casesDir: string, suite: string, ref: CaseRef): LoadedC
   exactVersion(raw.version, `${file}: version`);
   if (raw.version !== ref.version) bad('version', `suite pins ${ref.version}, found ${raw.version}`);
   if (!['positive', 'negative'].includes(raw.type)) bad('type', 'expected positive or negative');
+  if (raw.skill_intent !== undefined && !['trigger_positive', 'trigger_negative', 'adherence_check'].includes(raw.skill_intent)) bad('skill_intent', 'expected trigger_positive, trigger_negative, or adherence_check');
+  if (raw.target_skill !== undefined && (typeof raw.target_skill !== 'string' || !raw.target_skill.trim())) bad('target_skill', 'expected nonempty string');
   if (!Number.isInteger(raw.budgets?.timeout_ms) || raw.budgets.timeout_ms < 1 || raw.budgets.timeout_ms > 300000) bad('budgets.timeout_ms', 'expected integer 1..300000');
   if (!Number.isSafeInteger(raw.budgets?.max_steps) || raw.budgets.max_steps < 1) bad('budgets.max_steps', 'expected positive safe integer');
   if (!Array.isArray(raw.artifact_allowlist) || !raw.artifact_allowlist.includes('answer.json')
