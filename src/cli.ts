@@ -10,13 +10,14 @@ import { validateSchema } from './validation.ts';
 import { validateSuite } from './calibration.ts';
 import { generateCalibrationReport } from './calibration-report.ts';
 import { writeManifest } from './manifest.ts';
+import { setBaseline } from './baseline.ts';
 import type { Options } from './types.ts';
 
 try {
   const { values, positionals, tokens } = parseArgs({ allowPositionals: true, tokens: true, options: {
     suite: { type: 'string' }, agent: { type: 'string' },
     case: { type: 'string' }, 'cases-dir': { type: 'string' },
-    experiment: { type: 'string' },
+    experiment: { type: 'string' }, vary: { type: 'string', multiple: true },
     requirement: { type: 'string' },
     'schema-only': { type: 'boolean', default: false },
     'runs-dir': { type: 'string', default: 'runs' }, 'failed-from': { type: 'string' },
@@ -25,7 +26,30 @@ try {
     help: { type: 'boolean', default: false },
   } });
   if (values.help) {
-    console.log('Usage: pnpm eval [--suite smoke] [--agent stub|oracle|container|jackson-bot-pi] [--experiment <json>] [--case <id> | --failed-from <run-id> | --rerun <run-id>] [--repeat N] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\n       pnpm eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --schema-only [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --suite <name> [--cases-dir <path>] [--runs-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=success/all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
+    console.log('Usage: pnpm eval [--suite smoke] [--agent stub|oracle|container|jackson-bot-pi] [--experiment <json>] [--case <id> | --failed-from <run-id> | --rerun <run-id>] [--repeat N] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\n       pnpm eval baseline set <run-id> [--runs-dir <path>]\n       pnpm eval compare <baseline-run> <candidate-run> [--vary model|prompt|product_revision] [--runs-dir <path>]\n       pnpm eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --schema-only [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --suite <name> [--cases-dir <path>] [--runs-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=success/all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
+  } else if (positionals[0] === 'baseline') {
+    if (positionals.length !== 3 || positionals[1] !== 'set') throw new Error('usage: eval baseline set <run-id> [--runs-dir <path>]');
+    for (const token of tokens) {
+      if (token.kind === 'option' && token.name !== 'runs-dir') throw new Error(`baseline set: unsupported option --${token.name}`);
+    }
+    const file = setBaseline(resolve(values['runs-dir']!), positionals[2]);
+    console.log(`Baseline: ${positionals[2]}\nSelection history: ${file}`);
+  } else if (positionals[0] === 'compare') {
+    if (positionals.length !== 3) throw new Error('usage: eval compare <baseline-run> <candidate-run> [--vary model|prompt|product_revision] [--runs-dir <path>]');
+    for (const token of tokens) {
+      if (token.kind === 'option' && !['runs-dir', 'vary'].includes(token.name)) throw new Error(`compare: unsupported option --${token.name}`);
+    }
+    const { compareRuns } = await import('./compare.ts');
+    const comparison = compareRuns(resolve(values['runs-dir']!), positionals[1], positionals[2], values.vary ?? []);
+    console.log(`Comparison: ${comparison.compatible ? 'compatible' : 'incompatible'}`);
+    for (const reason of comparison.reasons) console.log(`  ${reason}`);
+    for (const difference of comparison.differences) console.log(`  ${difference.path} [${difference.derived ? 'derived' : difference.declared ? 'declared variable' : 'undeclared'}]: ${JSON.stringify(difference.baseline)} -> ${JSON.stringify(difference.candidate)}`);
+    for (const fault of comparison.run_faults) console.log(`  Run fault: ${fault}`);
+    console.log(`Counts: ${Object.entries(comparison.counts).map(([name, count]) => `${name}=${count}`).join(' ')}`);
+    for (const item of comparison.cases) console.log(`  ${item.case_id}: ${item.classification}`);
+    if (comparison.conclusion) console.log(`Conclusion: ${comparison.conclusion}`);
+    console.log(`JSON: ${join(comparison.output_dir, 'compare.json')}\nMarkdown: ${join(comparison.output_dir, 'compare.md')}`);
+    if (!comparison.compatible) process.exitCode = 2;
   } else if (positionals[0] === 'validate') {
     if (positionals.length !== 1 || (!values['schema-only'] && !values.suite)) throw new Error('usage: eval validate --suite <name> [--schema-only] [--cases-dir <path>] [--runs-dir <path>]');
     const allowed = values['schema-only'] ? ['schema-only', 'suite', 'cases-dir'] : ['suite', 'cases-dir', 'runs-dir'];
@@ -45,6 +69,8 @@ try {
       try { process.exitCode = (await validateSuite(casesDir, suite, resolve(values['runs-dir']!), controller.signal)).code; }
       finally { process.off('SIGINT', stop); process.off('SIGTERM', stop); }
     }
+  } else if (values.vary !== undefined) {
+    throw new Error('--vary is only supported by eval compare');
   } else if (values['schema-only']) {
     throw new Error('--schema-only is only supported by eval validate');
   } else if (positionals[0] === 'case') {
