@@ -4,6 +4,8 @@ import { readJson } from './config.ts';
 import { json } from './storage.ts';
 import type { Result, Status } from './types.ts';
 
+export const LOCAL_EVALUATION_NOTICE = '只验证评测链路（仅验评测链路），不代表产品/模型质量；未运行真实 jackson-bot adapter 或外网模型。';
+
 export function generateReport(dir: string) {
   const config = readJson(join(dir, 'config.json'));
   const results: Result[] = config.case_ids.flatMap((id: string) => {
@@ -18,6 +20,8 @@ export function generateReport(dir: string) {
   const code = state.interrupted || state.error || attempted > scored ? 2 : counts.fail ? 1 : 0;
   const summary = {
     run_id: config.run_id, agent: config.agent, source_run_id: config.source_run_id ?? null,
+    evaluation_scope: 'pipeline_only', scope_note: LOCAL_EVALUATION_NOTICE,
+    real_agent_attempted: 0, real_agent_pass_rate: null,
     config_source: config.config_source, attempted, scored, planned: config.case_ids.length,
     pass_rate: attempted ? counts.pass / attempted : null,
     scoring_coverage: attempted ? scored / attempted : null,
@@ -25,7 +29,7 @@ export function generateReport(dir: string) {
   };
   json(join(dir, 'summary.json'), summary);
   const pct = (v: number | null) => v === null ? 'N/A' : `${(v * 100).toFixed(1)}%`;
-  const lines = [`# Run ${config.run_id}`, '', `Agent: ${config.agent} (${config.agent === 'oracle' ? 'local reference solution' : 'local stub'}; not jackson-bot)`, `Configuration: ${config.config_source}`, `Source run: ${config.source_run_id ?? 'none'}`, '',
+  const lines = [`# Run ${config.run_id}`, '', `> ${LOCAL_EVALUATION_NOTICE}`, '', `Agent: ${config.agent} (${config.agent === 'oracle' ? 'local reference solution' : 'local stub'}; not jackson-bot)`, `Configuration: ${config.config_source}`, `Source run: ${config.source_run_id ?? 'none'}`, '',
     `Attempted: ${attempted}/${config.case_ids.length}; scored: ${scored}`, `All-attempt pass rate: ${pct(summary.pass_rate)} (pass / attempted)`, `Scoring coverage: ${pct(summary.scoring_coverage)} ((pass + fail) / attempted)`,
     `Counts: ${JSON.stringify(counts)}`, `Not attempted: ${notAttempted.join(', ') || 'none'}`, `Interrupted: ${summary.interrupted}; exit code: ${code}`, ''];
   if (state.error) lines.push(`Run error: ${state.error}`, '');

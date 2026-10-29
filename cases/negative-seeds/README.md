@@ -1,6 +1,6 @@
 # E6b：三条负例种子
 
-这里只交付 case 和本地作者验收入口，不注册正式 suite（E6c）。每例包含 requirement_id、brief、固定 fixture、独立可执行 Gold、硬断言和三个错误对照。
+本目录保存 E6b 原始 case 和本地作者验收入口；E6c 的 `e6-smoke` / `e6-full` 清单通过 source 引用复用它们，使用 `formal: false` 做本地链路检查。每例包含 requirement_id、brief、固定 fixture、独立可执行 Gold、硬断言和三个错误对照。
 
 | Case | 正确行为（pass） | 错误对照 |
 | --- | --- | --- |
@@ -23,4 +23,4 @@ pnpm test
 
 源 `reviewed=false`，校准不授予人工审核。测试只在临时副本模拟人工审核，验证未审核禁止正式运行、已审核且校准有效则通过、凭证缺失或内容变化后再次禁止。没有绕过 E5b 门禁。
 
-本地工具 trace/状态都是参考解或 adapter 声明的证据，不能证明真实服务没有副作用；本票不实现真实 jackson-bot adapter，不调用外网模型，不引入 Harbor/Workbench runtime，不覆盖任意提示注入，不做 E6c+ 接线。E6a 的 `cases/seeds` 与验收命令保持独立。
+本地工具 trace/状态都是参考解或 adapter 声明的证据，不能证明真实服务没有副作用；不实现真实 jackson-bot adapter，不调用外网模型，不引入 Harbor/Workbench runtime，不覆盖任意提示注入。E6c 接线见根 README；E6a 的 `cases/seeds` 与验收命令保持独立。
