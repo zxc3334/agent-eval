@@ -1,0 +1,29 @@
+{
+  "schema_version": 2,
+  "cases": [
+    {
+      "id": "tools-pass",
+      "version": "1.0.0"
+    },
+    {
+      "id": "tools-diagnostic",
+      "version": "1.0.0"
+    },
+    {
+      "id": "tools-bad-args",
+      "version": "1.0.0"
+    },
+    {
+      "id": "tools-write",
+      "version": "1.0.0"
+    },
+    {
+      "id": "tools-duplicate",
+      "version": "1.0.0"
+    },
+    {
+      "id": "tools-malformed",
+      "version": "1.0.0"
+    }
+  ]
+}
