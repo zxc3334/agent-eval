@@ -1,0 +1,21 @@
+{
+  "schema_version": 2,
+  "id": "bounded-recovery",
+  "version": "1.0.0",
+  "type": "positive",
+  "requirement_id": "REQ-E6a-bounded-recovery",
+  "brief": "brief.md",
+  "input": "input.json",
+  "fixture": "fixture.json",
+  "initial_state": "initial-state.json",
+  "acceptance": "acceptance.json",
+  "artifact_allowlist": [
+    "answer.json",
+    "trace.json",
+    "recovery.json"
+  ],
+  "budgets": {
+    "timeout_ms": 3000,
+    "max_steps": 3
+  }
+}

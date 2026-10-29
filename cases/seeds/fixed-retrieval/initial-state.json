@@ -1,0 +1,29 @@
+{
+  "request": {
+    "topic": "backup-retention",
+    "revision": 3
+  },
+  "documents": [
+    {
+      "id": "ops-v2",
+      "topic": "backup-retention",
+      "revision": 2,
+      "status": "archived",
+      "retention_days": 7
+    },
+    {
+      "id": "billing-v3",
+      "topic": "invoice-retention",
+      "revision": 3,
+      "status": "active",
+      "retention_days": 90
+    },
+    {
+      "id": "ops-v3",
+      "topic": "backup-retention",
+      "revision": 3,
+      "status": "active",
+      "retention_days": 30
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+{
+  "prompt": "仅从 initial_state.documents 查找 request 指定 topic、revision 且 status=active 的唯一资料。写 retrieval.json，包含 retention_days、source_id、revision；不得使用旧版本或其他主题。"
+}

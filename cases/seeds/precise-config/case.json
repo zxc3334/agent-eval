@@ -1,0 +1,20 @@
+{
+  "schema_version": 2,
+  "id": "precise-config",
+  "version": "1.0.0",
+  "type": "positive",
+  "requirement_id": "REQ-E6a-precise-config",
+  "brief": "brief.md",
+  "input": "input.json",
+  "fixture": "fixture.json",
+  "initial_state": "initial-state.json",
+  "acceptance": "acceptance.json",
+  "artifact_allowlist": [
+    "answer.json",
+    "config.json"
+  ],
+  "budgets": {
+    "timeout_ms": 3000,
+    "max_steps": 1
+  }
+}

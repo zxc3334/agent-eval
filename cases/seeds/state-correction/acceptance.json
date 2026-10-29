@@ -1,0 +1,139 @@
+{
+  "gold": {
+    "answer": "Completed."
+  },
+  "criteria": [
+    {
+      "id": "final",
+      "type": "equals",
+      "target": {
+        "artifact": "state.json",
+        "field": ""
+      },
+      "params": {
+        "expected": {
+          "destination": "Nanjing",
+          "date": "2026-11-04",
+          "travelers": 2,
+          "preferences": {
+            "seat": "window",
+            "language": "zh-CN"
+          }
+        }
+      },
+      "mode": "hard",
+      "reason": "最终状态使用每个字段最近一次纠正。"
+    },
+    {
+      "id": "history",
+      "type": "equals",
+      "target": {
+        "artifact": "history.json",
+        "field": "/snapshots"
+      },
+      "params": {
+        "expected": [
+          {
+            "turn_id": 1,
+            "state": {
+              "destination": "Suzhou",
+              "date": "2026-11-03",
+              "travelers": 1,
+              "preferences": {
+                "seat": "window",
+                "language": "zh-CN"
+              }
+            }
+          },
+          {
+            "turn_id": 2,
+            "state": {
+              "destination": "Nanjing",
+              "date": "2026-11-03",
+              "travelers": 1,
+              "preferences": {
+                "seat": "window",
+                "language": "zh-CN"
+              }
+            }
+          },
+          {
+            "turn_id": 3,
+            "state": {
+              "destination": "Nanjing",
+              "date": "2026-11-04",
+              "travelers": 2,
+              "preferences": {
+                "seat": "window",
+                "language": "zh-CN"
+              }
+            }
+          }
+        ]
+      },
+      "mode": "hard",
+      "reason": "每轮快照证明修改顺序与未修改字段的延续。"
+    },
+    {
+      "id": "preferences",
+      "type": "fields_preserved",
+      "target": {
+        "artifact": "state.json",
+        "field": ""
+      },
+      "params": {
+        "baseline": {
+          "destination": "Hangzhou",
+          "date": "2026-11-01",
+          "travelers": 1,
+          "preferences": {
+            "seat": "window",
+            "language": "zh-CN"
+          }
+        },
+        "fields": [
+          "/preferences"
+        ]
+      },
+      "mode": "hard",
+      "reason": "纠正目的地、日期和人数不得重置偏好。"
+    }
+  ],
+  "error_examples": [
+    {
+      "answer": "Completed.",
+      "reason": "使用第一次目的地，忽略后续纠正。",
+      "expected_failed_criteria": [
+        "final"
+      ],
+      "files": {
+        "state.json": "{\"destination\": \"Suzhou\", \"date\": \"2026-11-04\", \"travelers\": 2, \"preferences\": {\"seat\": \"window\", \"language\": \"zh-CN\"}}",
+        "history.json": "{\"snapshots\": [{\"turn_id\": 1, \"state\": {\"destination\": \"Suzhou\", \"date\": \"2026-11-03\", \"travelers\": 1, \"preferences\": {\"seat\": \"window\", \"language\": \"zh-CN\"}}}, {\"turn_id\": 2, \"state\": {\"destination\": \"Nanjing\", \"date\": \"2026-11-03\", \"travelers\": 1, \"preferences\": {\"seat\": \"window\", \"language\": \"zh-CN\"}}}, {\"turn_id\": 3, \"state\": {\"destination\": \"Nanjing\", \"date\": \"2026-11-04\", \"travelers\": 2, \"preferences\": {\"seat\": \"window\", \"language\": \"zh-CN\"}}}]}"
+      }
+    },
+    {
+      "answer": "Completed.",
+      "reason": "最终正确但错误地用最终状态覆盖所有历史快照。",
+      "expected_failed_criteria": [
+        "history"
+      ],
+      "files": {
+        "state.json": "{\"destination\": \"Nanjing\", \"date\": \"2026-11-04\", \"travelers\": 2, \"preferences\": {\"seat\": \"window\", \"language\": \"zh-CN\"}}",
+        "history.json": "{\"snapshots\": [{\"turn_id\": 1, \"state\": {\"destination\": \"Nanjing\", \"date\": \"2026-11-04\", \"travelers\": 2, \"preferences\": {\"seat\": \"window\", \"language\": \"zh-CN\"}}}, {\"turn_id\": 2, \"state\": {\"destination\": \"Nanjing\", \"date\": \"2026-11-04\", \"travelers\": 2, \"preferences\": {\"seat\": \"window\", \"language\": \"zh-CN\"}}}, {\"turn_id\": 3, \"state\": {\"destination\": \"Nanjing\", \"date\": \"2026-11-04\", \"travelers\": 2, \"preferences\": {\"seat\": \"window\", \"language\": \"zh-CN\"}}}]}"
+      }
+    },
+    {
+      "answer": "Completed.",
+      "reason": "最终纠正正确但重置无关偏好。",
+      "expected_failed_criteria": [
+        "final",
+        "preferences"
+      ],
+      "files": {
+        "state.json": "{\"destination\": \"Nanjing\", \"date\": \"2026-11-04\", \"travelers\": 2, \"preferences\": {\"seat\": \"aisle\", \"language\": \"zh-CN\"}}",
+        "history.json": "{\"snapshots\": [{\"turn_id\": 1, \"state\": {\"destination\": \"Suzhou\", \"date\": \"2026-11-03\", \"travelers\": 1, \"preferences\": {\"seat\": \"window\", \"language\": \"zh-CN\"}}}, {\"turn_id\": 2, \"state\": {\"destination\": \"Nanjing\", \"date\": \"2026-11-03\", \"travelers\": 1, \"preferences\": {\"seat\": \"window\", \"language\": \"zh-CN\"}}}, {\"turn_id\": 3, \"state\": {\"destination\": \"Nanjing\", \"date\": \"2026-11-04\", \"travelers\": 2, \"preferences\": {\"seat\": \"window\", \"language\": \"zh-CN\"}}}]}"
+      }
+    }
+  ],
+  "reviewed": false
+}

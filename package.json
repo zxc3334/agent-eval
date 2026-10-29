@@ -7,6 +7,7 @@
   "packageManager": "pnpm@11.19.0",
   "scripts": {
     "eval": "node src/cli.ts",
+    "validate:e6a": "node src/seed-validation.ts",
     "test": "node --test --test-concurrency=1 tests/*.test.ts",
     "typecheck": "tsc --noEmit"
   },

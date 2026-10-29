@@ -1,0 +1,20 @@
+{
+  "request": {
+    "job_id": "job-8",
+    "max_attempts": 2
+  },
+  "responses": [
+    {
+      "status": "transient_error",
+      "code": "BUSY"
+    },
+    {
+      "status": "ok",
+      "receipt": "receipt-8"
+    },
+    {
+      "status": "ok",
+      "receipt": "unused"
+    }
+  ]
+}

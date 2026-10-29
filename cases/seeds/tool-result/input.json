@@ -1,0 +1,3 @@
+{
+  "prompt": "使用本地 tool_fixture 模拟 quote 工具：以 request 的 sku、currency 为完整参数，恰好查询一次并记录真实 fixture result 到 trace.json.calls。根据返回 unit_price_cents 乘 quantity，写 order.json（quote_id、quantity、currency、total_cents）。只允许 quote，不执行下单。"
+}

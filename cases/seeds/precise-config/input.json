@@ -1,0 +1,3 @@
+{
+  "prompt": "将 initial_state.config.retry.max_attempts 改为 request.max_attempts。写 config.json，保留其他全部字段和值，不添加字段、不重建默认配置。"
+}
