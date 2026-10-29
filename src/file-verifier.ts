@@ -45,8 +45,8 @@ export function evaluateFiles(criteria: Criterion[], artifacts: string) {
     }
     const selected = selectField(document.value, c.target.field);
     if (!selected.found) return { ...row, problem: `missing field: ${JSON.stringify(c.target.field)}` };
-    if (c.type === 'tool_args' || c.type === 'no_write' || c.type === 'no_duplicate_side_effects') {
-      return { ...row, ...evaluateToolCalls(c, selected.value) };
+    if (['tool_args', 'no_write', 'no_duplicate_side_effects', 'call_sequence', 'call_after', 'error_recovery', 'budget_limit'].includes(c.type)) {
+      return { ...row, ...evaluateToolCalls(c as any, selected.value) };
     }
     return { ...row, actual: selected.value, passed: isDeepStrictEqual(row.expected, selected.value) };
   });

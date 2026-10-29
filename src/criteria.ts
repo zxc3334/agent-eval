@@ -26,6 +26,10 @@ export function criterionExpected(c: Criterion): unknown {
   if (c.type === 'json_parseable') return true;
   if (c.type === 'fields_preserved') return projectFields(c.params.baseline, c.params.fields);
   if (c.type === 'no_write' || c.type === 'no_duplicate_side_effects') return [];
+  if (c.type === 'call_sequence') return c.params.sequence;
+  if (c.type === 'call_after') return { prerequisite: c.params.prerequisite, successor: c.params.successor };
+  if (c.type === 'error_recovery') return { failing_tool: c.params.failing_tool, recovery_tool: c.params.recovery_tool };
+  if (c.type === 'budget_limit') return c.params.max_tool_calls ?? null;
   return c.params.expected;
 }
 
@@ -39,7 +43,9 @@ export function normalizeCriteria(value: unknown, source: string): Criterion[] {
     const field = `criteria[${i}]`;
     if (!record(input) || typeof input.id !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(input.id) || seen.has(input.id)) return bad(field, 'requires unique id using letters, digits, _ or -');
     seen.add(input.id);
-    if (typeof input.type !== 'string' || !['equals', 'json_parseable', 'fields_preserved', 'tool_args', 'no_write', 'no_duplicate_side_effects'].includes(input.type)) return bad(`${field}.type`, 'expected equals, json_parseable, fields_preserved, tool_args, no_write or no_duplicate_side_effects');
+    if (typeof input.type !== 'string' || !['equals', 'json_parseable', 'fields_preserved', 'tool_args', 'no_write', 'no_duplicate_side_effects', 'call_sequence', 'call_after', 'error_recovery', 'budget_limit'].includes(input.type)) {
+      return bad(`${field}.type`, 'expected equals, json_parseable, fields_preserved, tool_args, no_write, no_duplicate_side_effects, call_sequence, call_after, error_recovery or budget_limit');
+    }
     const legacy = input.type === 'equals' && !['target', 'params', 'mode', 'reason'].some(key => Object.hasOwn(input, key));
     if (legacy && !Object.hasOwn(input, 'expected')) return bad(`${field}.expected`, 'required');
     const raw = legacy ? { id: input.id, type: 'equals', target: { artifact: 'answer.json', field: 'answer' },
@@ -77,6 +83,34 @@ export function normalizeCriteria(value: unknown, source: string): Criterion[] {
       return raw.type === 'no_write'
         ? { ...base, type: 'no_write', params: { read_only_tools: names } }
         : { ...base, type: 'no_duplicate_side_effects', params: { side_effect_tools: names } };
+    }
+    if (raw.type === 'call_sequence') {
+      const { sequence, allow_subsequence } = raw.params;
+      if (!Array.isArray(sequence) || !sequence.length || sequence.some(s => typeof s !== 'string' || !s.trim())) {
+        return bad(`${field}.params`, 'call_sequence requires nonempty sequence of tool names');
+      }
+      return { ...base, type: 'call_sequence', params: { sequence, ...(allow_subsequence !== undefined ? { allow_subsequence: Boolean(allow_subsequence) } : {}) } };
+    }
+    if (raw.type === 'call_after') {
+      const { prerequisite, successor } = raw.params;
+      if (typeof prerequisite !== 'string' || !prerequisite.trim() || typeof successor !== 'string' || !successor.trim()) {
+        return bad(`${field}.params`, 'call_after requires prerequisite and successor tool names');
+      }
+      return { ...base, type: 'call_after', params: { prerequisite, successor } };
+    }
+    if (raw.type === 'error_recovery') {
+      const { failing_tool, recovery_tool } = raw.params;
+      if (typeof failing_tool !== 'string' || !failing_tool.trim() || typeof recovery_tool !== 'string' || !recovery_tool.trim()) {
+        return bad(`${field}.params`, 'error_recovery requires failing_tool and recovery_tool');
+      }
+      return { ...base, type: 'error_recovery', params: { failing_tool, recovery_tool } };
+    }
+    if (raw.type === 'budget_limit') {
+      const max = raw.params.max_tool_calls;
+      if (max !== undefined && (typeof max !== 'number' || !Number.isInteger(max) || max < 0)) {
+        return bad(`${field}.params`, 'budget_limit requires non-negative integer max_tool_calls');
+      }
+      return { ...base, type: 'budget_limit', params: { ...(typeof max === 'number' ? { max_tool_calls: max } : {}) } };
     }
     if (raw.target.field !== '') return bad(`${field}.target.field`, 'file assertions require the document root (empty string)');
     if (raw.type === 'json_parseable') {

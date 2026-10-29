@@ -14,7 +14,12 @@ export function evaluateToolCalls(c: ToolCriterion, value: unknown): ToolEvaluat
     if (!record(call) || typeof call.tool !== 'string' || !call.tool.trim() || !record(call.arguments)) {
       return { actual: null, passed: false, problem: `invalid tool call at index ${index}: requires nonempty tool and arguments object` };
     }
-    calls.push({ tool: call.tool, arguments: call.arguments });
+    calls.push({
+      tool: call.tool,
+      arguments: call.arguments,
+      ...(call.error ? { error: String(call.error) } : {}),
+      ...(call.result !== undefined ? { result: call.result } : {}),
+    });
   }
   if (c.type === 'tool_args') {
     const actual = calls.flatMap((call, index) => {
@@ -31,6 +36,76 @@ export function evaluateToolCalls(c: ToolCriterion, value: unknown): ToolEvaluat
     const actual = calls.flatMap((call, index) => c.params.read_only_tools.includes(call.tool) ? [] : [{ index, ...call }]);
     return { actual, passed: actual.length === 0,
       ...(actual.length ? { problem: 'calls outside read_only_tools are forbidden' } : {}) };
+  }
+  if (c.type === 'call_sequence') {
+    const toolNames = calls.map(item => item.tool);
+    if (c.params.allow_subsequence) {
+      let seqIdx = 0;
+      for (const name of toolNames) {
+        if (name === c.params.sequence[seqIdx]) {
+          seqIdx++;
+          if (seqIdx === c.params.sequence.length) break;
+        }
+      }
+      const passed = seqIdx === c.params.sequence.length;
+      return {
+        actual: toolNames,
+        passed,
+        ...(passed ? {} : { problem: `subsequence [${c.params.sequence.join(', ')}] not found in trace [${toolNames.join(', ')}]` }),
+      };
+    }
+    let passed = false;
+    for (let i = 0; i <= toolNames.length - c.params.sequence.length; i++) {
+      if (c.params.sequence.every((name, idx) => toolNames[i + idx] === name)) {
+        passed = true;
+        break;
+      }
+    }
+    return {
+      actual: toolNames,
+      passed,
+      ...(passed ? {} : { problem: `contiguous sequence [${c.params.sequence.join(', ')}] not found in trace [${toolNames.join(', ')}]` }),
+    };
+  }
+  if (c.type === 'call_after') {
+    const violations: { index: number; tool: string }[] = [];
+    let sawPrerequisite = false;
+    for (const [index, call] of calls.entries()) {
+      if (call.tool === c.params.prerequisite) sawPrerequisite = true;
+      if (call.tool === c.params.successor && !sawPrerequisite) {
+        violations.push({ index, tool: call.tool });
+      }
+    }
+    return {
+      actual: violations,
+      passed: violations.length === 0,
+      ...(violations.length ? { problem: `${c.params.successor} called at index ${violations.map(v => v.index).join(', ')} before prerequisite ${c.params.prerequisite}` } : {}),
+    };
+  }
+  if (c.type === 'error_recovery') {
+    const failedRecoveries: number[] = [];
+    for (let i = 0; i < calls.length; i++) {
+      if (calls[i].tool === c.params.failing_tool && Boolean(calls[i].error)) {
+        const next = calls[i + 1];
+        if (!next || next.tool !== c.params.recovery_tool) {
+          failedRecoveries.push(i);
+        }
+      }
+    }
+    return {
+      actual: failedRecoveries,
+      passed: failedRecoveries.length === 0,
+      ...(failedRecoveries.length ? { problem: `failed to invoke ${c.params.recovery_tool} immediately after error in ${c.params.failing_tool} at index ${failedRecoveries.join(', ')}` } : {}),
+    };
+  }
+  if (c.type === 'budget_limit') {
+    const max = c.params.max_tool_calls;
+    const passed = max === undefined || calls.length <= max;
+    return {
+      actual: calls.length,
+      passed,
+      ...(passed ? {} : { problem: `exceeded max_tool_calls: limit was ${max}, actual was ${calls.length}` }),
+    };
   }
   const seen: { index: number; call: ToolCall }[] = [];
   const actual: { index: number; first_index: number; tool: string; arguments: Record<string, unknown> }[] = [];

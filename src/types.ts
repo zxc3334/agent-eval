@@ -12,10 +12,16 @@ export type Criterion = CriterionBase & (
   | { type: 'tool_args'; params: { tool: string; field: string; expected: unknown } }
   | { type: 'no_write'; params: { read_only_tools: string[] } }
   | { type: 'no_duplicate_side_effects'; params: { side_effect_tools: string[] } }
+  | { type: 'call_sequence'; params: { sequence: string[]; allow_subsequence?: boolean } }
+  | { type: 'call_after'; params: { prerequisite: string; successor: string } }
+  | { type: 'error_recovery'; params: { failing_tool: string; recovery_tool: string } }
+  | { type: 'budget_limit'; params: { max_tool_calls?: number } }
 );
-export type ToolCriterion = Extract<Criterion, { type: 'tool_args' | 'no_write' | 'no_duplicate_side_effects' }>;
+export type ToolCriterion = Extract<Criterion, {
+  type: 'tool_args' | 'no_write' | 'no_duplicate_side_effects' | 'call_sequence' | 'call_after' | 'error_recovery' | 'budget_limit';
+}>;
 // One entry per attempted invocation; outcome/id metadata does not erase an attempt.
-export interface ToolCall { tool: string; arguments: Record<string, unknown> }
+export interface ToolCall { tool: string; arguments: Record<string, unknown>; error?: string; result?: unknown }
 export type VerifierFault = 'verifier_error' | 'verifier_timeout' | 'verifier_missing' | 'verifier_invalid';
 export interface Budgets { timeout_ms: number; max_steps: number }
 export interface Fixture { answer: unknown; delay_ms?: number; files?: Record<string, string> }
