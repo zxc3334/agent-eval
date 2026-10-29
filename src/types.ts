@@ -60,9 +60,33 @@ export interface CaseConfig {
 export interface LoadedCase {
   config: CaseConfig; file: string; input: AgentInput; acceptance: Acceptance;
 }
+export interface UnifiedTraceStep {
+  step_index: number;
+  timestamp?: string;
+  role: 'user' | 'assistant' | 'tool' | 'system';
+  thought?: string;
+  content?: string;
+  tool_calls?: ToolCall[];
+  tool_results?: { tool: string; result: unknown; error?: string }[];
+  usage?: { input_tokens?: number; output_tokens?: number };
+}
+export interface UnifiedTrace {
+  schema_version: 1;
+  trace_id: string;
+  session_id?: string;
+  task_prompt: string;
+  initial_state?: Record<string, unknown>;
+  steps: UnifiedTraceStep[];
+  final_answer?: unknown;
+  artifacts?: Record<string, string | unknown>;
+  metadata?: Record<string, unknown>;
+}
 // Execution choices belong to the harness, not to the task presented to the agent.
 export interface ExperimentConfig {
-  adapter: 'stub' | 'oracle' | 'container' | 'jackson-bot-pi'; model: string | null; product: Record<string, unknown>;
+  adapter: 'stub' | 'oracle' | 'container' | 'jackson-bot-pi' | 'replay';
+  model: string | null;
+  product: Record<string, unknown>;
+  trace_file?: string;
 }
 export interface Assertion {
   criterion_id: string; expected: unknown; actual: unknown; passed: boolean; artifact: string;
@@ -83,4 +107,5 @@ export interface Options {
   selectedIds?: string[]; sourceRunId?: string;
   experimentFile: string;
   repeat?: number; rerunSource?: string;
+  traceFile?: string;
 }

@@ -18,7 +18,7 @@ try {
     suite: { type: 'string' }, agent: { type: 'string' },
     case: { type: 'string' }, 'cases-dir': { type: 'string' },
     experiment: { type: 'string' }, 'experiment-record': { type: 'string' }, vary: { type: 'string', multiple: true },
-    requirement: { type: 'string' }, 'from-run': { type: 'string' },
+    requirement: { type: 'string' }, 'from-run': { type: 'string' }, 'from-trace': { type: 'string' }, trace: { type: 'string' },
     'schema-only': { type: 'boolean', default: false },
     'runs-dir': { type: 'string', default: 'runs' }, 'failed-from': { type: 'string' },
     rerun: { type: 'string' }, repeat: { type: 'string' },
@@ -76,13 +76,31 @@ try {
   } else if (values['schema-only']) {
     throw new Error('--schema-only is only supported by eval validate');
   } else if (positionals[0] === 'case') {
-    if (positionals[1] !== 'new' || positionals.length !== 3 || (values['from-run'] ? !values.case || values.requirement !== undefined : !values.requirement || values.case !== undefined)) throw new Error('usage: eval case new <id> --requirement <id> | --from-run <run-id> --case <source-id> [--suite smoke] [--cases-dir <path>] [--runs-dir <path>]');
-    for (const token of tokens) {
-      if (token.kind === 'option' && !['requirement', 'suite', 'cases-dir', ...(values['from-run'] ? ['from-run', 'case', 'runs-dir'] : [])].includes(token.name)) throw new Error(`case new: unsupported option --${token.name}`);
+    if (positionals[1] === 'from-trace') {
+      if (positionals.length !== 3 || !values.requirement || (!values.trace && !values['from-trace'])) {
+        throw new Error('usage: eval case from-trace <id> --trace <path> --requirement <id> [--suite smoke] [--cases-dir <path>]');
+      }
+      for (const token of tokens) {
+        if (token.kind === 'option' && !['trace', 'from-trace', 'requirement', 'suite', 'cases-dir'].includes(token.name)) throw new Error(`case from-trace: unsupported option --${token.name}`);
+      }
+      const { scaffoldFromTrace } = await import('./trace.ts');
+      const dir = scaffoldFromTrace({
+        traceFile: resolve((values.trace ?? values['from-trace'])!),
+        casesDir: resolve(values['cases-dir'] ?? 'cases'),
+        suite: values.suite ?? 'smoke',
+        id: positionals[2],
+        requirementId: values.requirement!,
+      });
+      console.log(`Created case from trace: ${dir}\nBrief: ${join(dir, 'brief.md')}\nRegistered version 1.0.0 in suite ${values.suite ?? 'smoke'}.`);
+    } else if (positionals[1] !== 'new' || positionals.length !== 3 || (values['from-run'] ? !values.case || values.requirement !== undefined : !values.requirement || values.case !== undefined)) throw new Error('usage: eval case new <id> --requirement <id> | --from-run <run-id> --case <source-id> [--suite smoke] [--cases-dir <path>] [--runs-dir <path>]');
+    else {
+      for (const token of tokens) {
+        if (token.kind === 'option' && !['requirement', 'suite', 'cases-dir', ...(values['from-run'] ? ['from-run', 'case', 'runs-dir'] : [])].includes(token.name)) throw new Error(`case new: unsupported option --${token.name}`);
+      }
+      const feedback = values['from-run'] ? feedbackSource(values['runs-dir']!, values['from-run'], values.case!) : undefined;
+      const dir = createCase(values['cases-dir'] ?? 'cases', values.suite ?? 'smoke', positionals[2], feedback?.requirementId ?? values.requirement!, feedback?.source);
+      console.log(`Created case: ${dir}\nBrief: ${join(dir, 'brief.md')}\nRegistered version 1.0.0 in suite ${values.suite ?? 'smoke'}.\nTODO: fill brief, public inputs, private acceptance, gold.md and solve.ts; reviewed=false. The placeholder intentionally fails (exit 1).`);
     }
-    const feedback = values['from-run'] ? feedbackSource(values['runs-dir']!, values['from-run'], values.case!) : undefined;
-    const dir = createCase(values['cases-dir'] ?? 'cases', values.suite ?? 'smoke', positionals[2], feedback?.requirementId ?? values.requirement!, feedback?.source);
-    console.log(`Created case: ${dir}\nBrief: ${join(dir, 'brief.md')}\nRegistered version 1.0.0 in suite ${values.suite ?? 'smoke'}.\nTODO: fill brief, public inputs, private acceptance, gold.md and solve.ts; reviewed=false. The placeholder intentionally fails (exit 1).`);
   } else if (values.requirement !== undefined) {
     throw new Error('--requirement is only supported by eval case new');
   } else if (values['from-run'] !== undefined) {
@@ -99,7 +117,7 @@ try {
     console.log(`Report: ${dir}/${existsSync(join(dir, 'compare.json')) ? 'compare.md' : 'report.md'}`);
   } else {
     if (positionals.length) throw new Error('usage: eval [options] | eval report <run-id> | eval case new <id> --requirement <id>');
-    if (values.agent !== undefined && !['stub', 'oracle', 'container', 'jackson-bot-pi'].includes(values.agent)) throw new Error('agent: only stub, oracle, container and jackson-bot-pi are supported');
+    if (values.agent !== undefined && !['stub', 'oracle', 'container', 'jackson-bot-pi', 'replay'].includes(values.agent)) throw new Error('agent: only stub, oracle, container, jackson-bot-pi and replay are supported');
     if ([values.case, values['failed-from'], values.rerun].filter(Boolean).length > 1) throw new Error('case, failed-from and rerun are mutually exclusive');
     if (values.repeat !== undefined && (!/^[1-9]\d*$/.test(values.repeat) || !Number.isSafeInteger(Number(values.repeat)))) throw new Error('repeat: expected positive safe integer');
     const runsDir = resolve(values['runs-dir']!);
@@ -124,6 +142,7 @@ try {
       watch: values.watch!, failFast: values['fail-fast'] || (values.rerun ? source?.fail_fast ?? false : false), selectedIds, sourceRunId,
       repeat: values.repeat === undefined ? (values.rerun ? source?.repeat ?? 1 : 1) : Number(values.repeat),
       rerunSource: sourceRunId && (values.rerun || existsSync(join(runsDir, sourceRunId, 'manifest.json'))) ? sourceRunId : undefined,
+      traceFile: values.trace ? resolve(values.trace) : undefined,
     };
     if (options.runsDir === options.casesDir || options.runsDir === join(options.casesDir, options.suite)
       || existsSync(join(options.runsDir, 'case.json')) || existsSync(join(options.runsDir, 'suite.json'))) {

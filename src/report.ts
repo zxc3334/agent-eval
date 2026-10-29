@@ -49,7 +49,7 @@ export function generateReport(dir: string) {
   };
   json(join(dir, 'summary.json'), summary);
   const pct = (v: number | null) => v === null ? 'N/A' : `${(v * 100).toFixed(1)}%`;
-  const agentDescription = config.agent === 'jackson-bot-pi' ? 'jackson-bot product adapter' : `${config.agent === 'oracle' ? 'local reference solution' : config.agent === 'container' ? 'local scripted container fixture' : 'local stub'}; not jackson-bot`;
+  const agentDescription = config.agent === 'jackson-bot-pi' ? 'jackson-bot product adapter' : `${config.agent === 'oracle' ? 'local reference solution' : config.agent === 'container' ? 'local scripted container fixture' : config.agent === 'replay' ? 'offline trace replay' : 'local stub'}; not jackson-bot`;
   const quote = (value: string) => `'${value.replace(/'/g, `'"'"'`)}'`;
   const rerun = `pnpm eval --rerun ${quote(config.run_id)} --runs-dir ${quote(dirname(resolve(dir)))}`;
   const lines = [`# Run ${config.run_id}`, '', `> ${scopeNote}`, '', `Agent: ${config.agent} (${agentDescription})`, `Configuration: ${config.config_source}`, `Source run: ${config.source_run_id ?? 'none'}`, '',

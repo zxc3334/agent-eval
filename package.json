@@ -22,7 +22,8 @@
     "validate:e8": "node --test --test-concurrency=1 tests/e8*.test.ts",
     "validate:e9": "node --test --test-concurrency=1 tests/e9*.test.ts",
     "validate:e10": "node --test --test-concurrency=1 tests/e10*.test.ts",
-    "validate:e11": "node --test --test-concurrency=1 tests/e11*.test.ts"
+    "validate:e11": "node --test --test-concurrency=1 tests/e11*.test.ts",
+    "validate:e12": "node --test --test-concurrency=1 tests/e12*.test.ts"
   },
   "devDependencies": {
     "@types/node": "20.17.19",

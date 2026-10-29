@@ -33,6 +33,7 @@ export async function run(options: Options, signal: AbortSignal = new AbortContr
     catch { return { case_id: ref.id, requirement_id: null }; }
   });
   const experiment = loadExperiment(options.experimentFile);
+  if (options.traceFile) experiment.trace_file = options.traceFile;
   if (options.agent !== experiment.adapter) throw new Error(`agent: ${options.agent} does not match experiment adapter ${experiment.adapter}`);
   const manifest = createManifest(options, cases, experiment);
   if (options.rerunSource) {

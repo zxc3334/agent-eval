@@ -167,8 +167,8 @@ export function loadCase(casesDir: string, suite: string, ref: CaseRef): LoadedC
 }
 export function loadExperiment(file: string): ExperimentConfig {
   const raw = readJson(file);
-  if (!['stub', 'oracle', 'container', 'jackson-bot-pi'].includes(raw?.adapter)) throw new Error(`${file}: adapter: only stub, oracle, container and jackson-bot-pi are supported`);
+  if (!['stub', 'oracle', 'container', 'jackson-bot-pi', 'replay'].includes(raw?.adapter)) throw new Error(`${file}: adapter: only stub, oracle, container, jackson-bot-pi and replay are supported`);
   if (raw.model !== null && (typeof raw.model !== 'string' || !raw.model.trim())) throw new Error(`${file}: model: expected string or null`);
   if (!object(raw.product)) throw new Error(`${file}: product: expected JSON object`);
-  return { adapter: raw.adapter, model: raw.model, product: raw.product };
+  return { adapter: raw.adapter, model: raw.model, product: raw.product, ...(typeof raw.trace_file === 'string' ? { trace_file: raw.trace_file } : {}) };
 }

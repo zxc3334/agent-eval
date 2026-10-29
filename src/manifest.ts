@@ -54,6 +54,7 @@ export function createManifest(options: Options, cases: LoadedCase[], experiment
   const adapterFiles: Record<string, string[]> = {
     stub: ['src/process.ts', 'src/stub.ts'], oracle: ['src/oracle.ts'],
     container: ['src/container.ts'], 'jackson-bot-pi': ['src/jackson-bot-pi.ts'],
+    replay: ['src/trace.ts'],
   };
   const images = [...new Set(cases.flatMap(c => c.config.execution ? [c.config.execution.image] : []))].sort();
   return {

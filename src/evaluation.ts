@@ -11,6 +11,7 @@ import { normalizeCriteria } from './criteria.ts';
 import { verify } from './verifier.ts';
 import { invokeOracle, oracleInput } from './oracle.ts';
 import { invokeJacksonBotPi } from './jackson-bot-pi.ts';
+import { replayTrace } from './trace.ts';
 import type { GoldSource } from './oracle.ts';
 import type { DockerCommand } from './container.ts';
 import type { ErrorExample, LoadedCase, Result, ExperimentConfig } from './types.ts';
@@ -59,6 +60,8 @@ export async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal, 
       ? await invokeOracle(gold, input, caseDir, workspace, artifacts, temp, signal)
       : executor === 'jackson-bot-pi'
       ? await invokeJacksonBotPi({ experiment: experiment!, input: c.input, workspace, artifacts, temp, session, signal, onSteps: steps => { result.steps_used = steps; } })
+      : executor === 'replay'
+      ? replayTrace(experiment?.trace_file ?? (c.input.fixture as any)?.trace ?? c.input.fixture, workspace, artifacts, events)
       : await invokeStub(workspace, artifacts, temp, c.input.budgets.timeout_ms, c.config.inject, signal);
     if (outcome.stepsUsed !== undefined) result.steps_used = outcome.stepsUsed;
     if (outcome.usage) result.usage = outcome.usage;
