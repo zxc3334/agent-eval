@@ -1,9 +1,25 @@
 {
+  "schema_version": 2,
   "cases": [
-    "agent_error",
-    "protocol_error",
-    "timeout",
-    "verifier_error",
-    "environment_error"
+    {
+      "id": "agent_error",
+      "version": "1.0.0"
+    },
+    {
+      "id": "protocol_error",
+      "version": "1.0.0"
+    },
+    {
+      "id": "timeout",
+      "version": "1.0.0"
+    },
+    {
+      "id": "verifier_error",
+      "version": "1.0.0"
+    },
+    {
+      "id": "environment_error",
+      "version": "1.0.0"
+    }
   ]
 }

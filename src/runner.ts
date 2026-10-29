@@ -1,9 +1,9 @@
-import { mkdirSync, writeFileSync, appendFileSync, cpSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, appendFileSync, copyFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { loadCase, readJson, suiteIds } from './config.ts';
+import { loadCase, loadExperiment, readJson, suiteCases } from './config.ts';
 import { json } from './storage.ts';
 import { invokeStub } from './process.ts';
 import { generateReport } from './report.ts';
@@ -23,12 +23,14 @@ async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal): Promis
     json(join(caseDir, 'snapshot.json'), c);
     if (c.config.inject === 'environment_error') throw new Error('injected workspace preparation failure');
     temp = mkdtempSync(join(tmpdir(), 'agent-eval-'));
-    json(join(workspace, 'input.json'), c.input); json(join(workspace, 'fixture.json'), c.fixture);
-    stage = 'agent'; event('agent_start', { agent: 'stub', timeout_ms: c.config.timeout_ms });
-    const outcome = await invokeStub(workspace, artifacts, temp, c.config.timeout_ms, c.config.inject, signal);
-    cpSync(workspace, artifacts, { recursive: true });
+    json(join(workspace, 'input.json'), c.input);
+    stage = 'agent'; event('agent_start', { agent: 'stub', ...c.input.budgets });
+    const outcome = await invokeStub(workspace, artifacts, temp, c.input.budgets.timeout_ms, c.config.inject, signal);
+    for (const name of c.input.artifact_allowlist) {
+      if (existsSync(join(workspace, name))) copyFileSync(join(workspace, name), join(artifacts, name));
+    }
     if (signal.aborted) { result.status = 'environment_error'; throw new Error('interrupted by signal'); }
-    if (outcome.timedOut) { result.status = 'timeout'; throw new Error(`budget exceeded (${c.config.timeout_ms}ms)`); }
+    if (outcome.timedOut) { result.status = 'timeout'; throw new Error(`budget exceeded (${c.input.budgets.timeout_ms}ms)`); }
     if (outcome.error) { result.status = 'environment_error'; throw new Error(outcome.error); }
     result.status = 'agent_error';
     if (outcome.code !== 0) throw new Error(`stub exited with code ${outcome.code}`);
@@ -37,7 +39,7 @@ async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal): Promis
     if (!response || !Object.hasOwn(response, 'answer')) throw new Error('answer.json: answer: required');
     stage = 'verifier'; result.status = 'verifier_error';
     if (c.config.inject === 'verifier_error') throw new Error('injected verifier exception');
-    result.assertions = c.criteria.map(criterion => ({ criterion_id: criterion.id, expected: criterion.expected, actual: response.answer, passed: isDeepStrictEqual(criterion.expected, response.answer), artifact: join(artifacts, 'answer.json') }));
+    result.assertions = c.acceptance.criteria.map(criterion => ({ criterion_id: criterion.id, expected: criterion.expected, actual: response.answer, passed: isDeepStrictEqual(criterion.expected, response.answer), artifact: join(artifacts, 'answer.json') }));
     event('verifier', result.assertions);
     result.status = result.assertions.every(a => a.passed) ? 'pass' : 'fail';
   } catch (error) {
@@ -54,14 +56,17 @@ async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal): Promis
 
 export async function run(options: Options, signal: AbortSignal = new AbortController().signal): Promise<{ runId: string; code: number }> {
   if (process.platform === 'win32') throw new Error('environment: M0 process-tree cleanup requires macOS or Linux');
-  const all = suiteIds(options.casesDir, options.suite);
+  const refs = suiteCases(options.casesDir, options.suite);
+  const all = refs.map(ref => ref.id);
   const ids = options.selectedIds ?? (options.caseId ? [options.caseId] : all);
   if (ids.some(id => !all.includes(id))) throw new Error(`case: ${ids.filter(id => !all.includes(id)).join(', ')} not in suite ${options.suite}`);
-  const cases = ids.map(id => loadCase(options.casesDir, options.suite, id));
+  const cases = ids.map(id => loadCase(options.casesDir, options.suite, refs.find(ref => ref.id === id)!));
+  const experiment = loadExperiment(options.experimentFile);
+  if (options.agent !== experiment.adapter) throw new Error(`agent: ${options.agent} does not match experiment adapter ${experiment.adapter}`);
   const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID()}`;
   const dir = join(options.runsDir, runId); mkdirSync(dir, { recursive: true });
   const configSource = `${options.casesDir} (current files; suite=${options.suite})`;
-  json(join(dir, 'config.json'), { run_id: runId, agent: options.agent, suite: options.suite, cases_dir: options.casesDir, case_ids: ids, config_source: configSource, source_run_id: options.sourceRunId ?? null, fail_fast: options.failFast, cases });
+  json(join(dir, 'config.json'), { run_id: runId, agent: options.agent, experiment, experiment_file: options.experimentFile, suite: options.suite, cases_dir: options.casesDir, case_ids: ids, case_refs: cases.map(c => ({ id: c.config.id, version: c.config.version })), config_source: configSource, source_run_id: options.sourceRunId ?? null, fail_fast: options.failFast, cases });
   console.log(`Run ${runId}\nRun directory: ${dir}\nConfiguration source: ${configSource}\nSource run: ${options.sourceRunId ?? 'none'}`);
   let error: string | undefined;
   try {

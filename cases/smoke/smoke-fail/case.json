@@ -1,1 +1,18 @@
-{ "id": "smoke-fail", "input": "input.json", "fixture": "fixture.json", "acceptance": "acceptance.json", "timeout_ms": 2000 }
+{
+  "schema_version": 2,
+  "id": "smoke-fail",
+  "version": "1.0.0",
+  "type": "negative",
+  "input": "input.json",
+  "fixture": "fixture.json",
+  "initial_state": "initial-state.json",
+  "artifact_allowlist": [
+    "answer.json",
+    "resource.json"
+  ],
+  "budgets": {
+    "timeout_ms": 2000,
+    "max_steps": 1
+  },
+  "acceptance": "acceptance.json"
+}
