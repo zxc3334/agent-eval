@@ -72,7 +72,12 @@
   "error_examples": [
     {
       "answer": "Completed successfully.",
-      "reason": "Self-reported success cannot substitute for a valid trace and matching calls."
+      "reason": "Self-reported success cannot substitute for a valid trace and matching calls.",
+      "expected_failed_criteria": [
+        "args",
+        "once",
+        "owner"
+      ]
     }
   ],
   "reviewed": false

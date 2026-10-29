@@ -7,6 +7,8 @@ import { generateReport } from './report.ts';
 import { identifier, readJson } from './config.ts';
 import { createCase } from './scaffold.ts';
 import { validateSchema } from './validation.ts';
+import { validateSuite } from './calibration.ts';
+import { generateCalibrationReport } from './calibration-report.ts';
 import type { Options } from './types.ts';
 
 try {
@@ -21,17 +23,26 @@ try {
     help: { type: 'boolean', default: false },
   } });
   if (values.help) {
-    console.log('Usage: pnpm eval [--suite smoke] [--agent stub|oracle] [--experiment <json>] [--case <id> | --failed-from <run-id>] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\n       pnpm eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --schema-only [--suite smoke] [--cases-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=success/all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
+    console.log('Usage: pnpm eval [--suite smoke] [--agent stub|oracle] [--experiment <json>] [--case <id> | --failed-from <run-id>] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\n       pnpm eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --schema-only [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --suite <name> [--cases-dir <path>] [--runs-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=success/all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
   } else if (positionals[0] === 'validate') {
-    if (positionals.length !== 1 || !values['schema-only']) throw new Error('usage: eval validate --schema-only [--suite smoke] [--cases-dir <path>]');
+    if (positionals.length !== 1 || (!values['schema-only'] && !values.suite)) throw new Error('usage: eval validate --suite <name> [--schema-only] [--cases-dir <path>] [--runs-dir <path>]');
+    const allowed = values['schema-only'] ? ['schema-only', 'suite', 'cases-dir'] : ['suite', 'cases-dir', 'runs-dir'];
     for (const token of tokens) {
-      if (token.kind === 'option' && !['schema-only', 'suite', 'cases-dir'].includes(token.name)) throw new Error(`validate: unsupported option --${token.name}; use only --schema-only, --suite and --cases-dir`);
+      if (token.kind === 'option' && !allowed.includes(token.name)) throw new Error(`validate: unsupported option --${token.name}`);
     }
     const suite = values.suite ?? 'smoke';
-    const result = validateSchema(resolve(values['cases-dir'] ?? 'cases'), suite);
-    for (const error of result.errors) console.error(`schema_error: ${error}`);
-    console.log(`Schema-only ${suite}: checked ${result.checked} case(s), ${result.errors.length} error(s).`);
-    process.exitCode = result.errors.length ? 2 : 0;
+    const casesDir = resolve(values['cases-dir'] ?? 'cases');
+    if (values['schema-only']) {
+      const result = validateSchema(casesDir, suite);
+      for (const error of result.errors) console.error(`schema_error: ${error}`);
+      console.log(`Schema-only ${suite}: checked ${result.checked} case(s), ${result.errors.length} error(s).`);
+      process.exitCode = result.errors.length ? 2 : 0;
+    } else {
+      const controller = new AbortController(); const stop = () => controller.abort();
+      process.on('SIGINT', stop); process.on('SIGTERM', stop);
+      try { process.exitCode = (await validateSuite(casesDir, suite, resolve(values['runs-dir']!), controller.signal)).code; }
+      finally { process.off('SIGINT', stop); process.off('SIGTERM', stop); }
+    }
   } else if (values['schema-only']) {
     throw new Error('--schema-only is only supported by eval validate');
   } else if (positionals[0] === 'case') {
@@ -45,7 +56,9 @@ try {
     throw new Error('--requirement is only supported by eval case new');
   } else if (positionals[0] === 'report' && positionals.length === 2) {
     const dir = resolve(values['runs-dir']!, identifier(positionals[1], 'run-id'));
-    generateReport(dir); console.log(`Report: ${dir}/report.md`);
+    if (readJson(join(dir, 'config.json')).kind === 'calibration') generateCalibrationReport(dir);
+    else generateReport(dir);
+    console.log(`Report: ${dir}/report.md`);
   } else {
     if (positionals.length) throw new Error('usage: eval [options] | eval report <run-id> | eval case new <id> --requirement <id>');
     if (values.agent !== undefined && !['stub', 'oracle'].includes(values.agent)) throw new Error('agent: only stub and oracle are supported');

@@ -84,7 +84,12 @@
   "error_examples": [
     {
       "answer": "success: updated configuration to dark",
-      "reason": "Keywords do not prove that config.json exists or preserves unrelated fields."
+      "reason": "Keywords do not prove that config.json exists or preserves unrelated fields.",
+      "expected_failed_criteria": [
+        "config-json",
+        "theme-updated",
+        "unrelated-kept"
+      ]
     }
   ],
   "reviewed": false

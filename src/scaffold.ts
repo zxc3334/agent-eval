@@ -21,6 +21,7 @@ export function createCase(casesDir: string, suite: string, id: string, requirem
   try {
     const refs = existsSync(suiteFile) ? suiteCases(casesDir, suite) : [];
     const manifest = existsSync(suiteFile) ? readJson(suiteFile) : { schema_version: 2, cases: [] };
+    if (manifest.formal === true) throw new Error(`${suiteFile}: case new creates an unreviewed draft; fix: author and calibrate in a local suite before registering in a formal suite`);
     if (refs.some(ref => ref.id === id) || existsSync(dir)) throw new Error(`case ${id}: already exists in ${suiteDir}; choose a new id`);
     mkdirSync(dir); created = true;
     const config: CaseConfig = {
@@ -34,7 +35,7 @@ export function createCase(casesDir: string, suite: string, id: string, requirem
       gold: { answer: 'TODO_EXPECTED_ANSWER' },
       criteria: [{ id: 'answer-equals', type: 'equals', target: { artifact: 'answer.json', field: 'answer' },
         params: { expected: 'TODO_EXPECTED_ANSWER' }, mode: 'hard', reason: 'TODO: 解释此检查对应的需求和失败影响。' }],
-      error_examples: [{ answer: 'TODO_STUB_RESPONSE', reason: 'TODO: 描述此响应如何违反验收标准。' }],
+      error_examples: [{ expected_failed_criteria: ['answer-equals'], answer: 'TODO_STUB_RESPONSE', reason: 'TODO: 描述此响应如何违反验收标准。' }],
       reviewed: false,
     };
     json(join(dir, 'case.json'), config);
@@ -48,7 +49,7 @@ TODO: 根据需求独立编写 solve.ts，解释如何从 initial_state 得到�
 不要读取 acceptance.json 或导入 verifier 的业务实现。Gold 与 verifier 必须独立实现。
 运行 pnpm eval --suite ${suite} --case ${id} --agent oracle，检查 artifacts/ 与 verifier/ 的证据。
 当前 solve.ts 故意输出 TODO_REFERENCE_ANSWER，与验收期望不同，Oracle 也应失败。
-reviewed 不控制本地执行；本模板不提供审核门禁。
+运行 pnpm eval validate --suite ${suite} 校准 Oracle 与全部错误对照。校准通过并检查证据后设置 reviewed=true；formal suite 会校验内容哈希。
 `);
     writeFileSync(join(dir, 'solve.ts'), `import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -62,7 +63,7 @@ writeFileSync('answer.json', JSON.stringify({ answer: 'TODO_REFERENCE_ANSWER', s
 requirement_id: ${requirementId}
 case_id: ${id}
 
-这是评测者私有的设计材料，不进入 AgentInput。TODO 填完并人工确认后，才将 acceptance.json 的 reviewed 改为 true。
+这是评测者私有的设计材料，不进入 AgentInput。TODO 填完、validate 校准通过并人工检查证据后，才将 acceptance.json 的 reviewed 改为 true。
 
 ## 目标行为
 

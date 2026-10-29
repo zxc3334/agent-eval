@@ -54,7 +54,7 @@ smoke 有两个协议样例：`smoke-pass` 输出 `hello`，`smoke-fail` 输出 
 
 公开 `AgentInput` 仅含 `prompt`、`fixture`、`initial_state`、`artifact_allowlist`、`budgets`。loader 逐字段构造并序列化到 `workspace/input.json`，不将 case、验收或实验对象整体展开。fixture 与初始状态的内容均视为公开，编写时不能放 Gold 或私有答案；stub 的 fixture.answer 是用于演示的确定性响应，验收真值独立保存在 acceptance 中。
 
-私有 `acceptance.json` 的 Gold、criteria、错误对照和 reviewed 不复制到工作目录，也不属于 AgentInput。`reviewed: false` 表示尚未经人工确认，不阻止本地迭代；现有样例均为 false。`type` 表达用例类别，negative 不反转判分，仍由 criteria 判断。旧 `acceptance.gold.answer` 保留结构兼容，但不作为 Oracle 输出来源或判分依据。E5a 执行独立 `solve.ts`，不做错误对照校准或 E5b reviewed 门禁。
+私有 `acceptance.json` 的 Gold、criteria、错误对照和 reviewed 不复制到工作目录，也不属于 AgentInput。`reviewed: false` 表示尚未经人工确认，不阻止本地迭代；现有样例均为 false。`type` 表达用例类别，negative 不反转判分，仍由 criteria 判断。旧 `acceptance.gold.answer` 保留结构兼容，但不作为 Oracle 输出来源或判分依据。E5a 执行独立 `solve.ts`；E5b 的错误对照校准与正式 suite 门禁见文末。
 
 suite 必须引用精确 case 版本，拒绝范围、latest、缺版本和重复 id：
 
@@ -292,7 +292,7 @@ pnpm eval --suite tools --case tools-pass --agent stub  # 退出 0
 
 ## 本波边界
 
-E4c 在已有 E4a/E4b 上增加工具参数、禁写和重复副作用断言，沿用 E3c schema-only 校验和 AgentInput 隔离。借鉴 Harbor 的独立 verifier/产物分离与 Workbench 的需求→case→证据，不采用二者 runtime。E4c 阶段未实现 Oracle；E5a 的执行路径见下节。仍不实现 E5b reviewed 门禁、E6 seeds、真实 adapter、跨 run baseline 对比、公共榜、云并行、线上 QQ 或模型调用。
+E4c 在已有 E4a/E4b 上增加工具参数、禁写和重复副作用断言，沿用 E3c schema-only 校验和 AgentInput 隔离。借鉴 Harbor 的独立 verifier/产物分离与 Workbench 的需求→case→证据，不采用二者 runtime。E4c 阶段未实现 Oracle；E5a 的执行路径见下节。E5b 校准与 reviewed 门禁见文末。仍不实现 E6 seeds、真实 adapter、跨 run baseline 对比、公共榜、云并行、线上 QQ 或模型调用。
 
 本机验收是 macOS arm64；Linux 使用相同 POSIX 机制但尚未实机验证，Windows 不支持本波进程组清理。不可捕获的 SIGKILL/断电不保证最后一份报告已写完；已写入的证据保留。stub 进程隔离用于生命周期管理，不是执行不可信代码的安全沙箱。
 
@@ -345,4 +345,48 @@ OracleInput 仅有 `prompt`、`initial_state`、`artifact_allowlist`、`budgets`
 
 支持 `--case`、`--fail-fast`、`--watch` 和 `--failed-from`。watch 会监听参考文件；failed-from 默认继承源 run 的 executor/experiment，读取当前 case 与参考解，再从固定初态重跑；可显式切换 `--agent`。报告可在源 case 不存在时从 run 产物离线重建。
 
-本票不实现 E5b reviewed 门禁、E6 seeds、Gold 错误对照校准或真实 jackson-bot adapter；所有已有 reviewed 值保持不变。
+E5a 的 Oracle 执行能力由下述 E5b 校准复用；所有已有 reviewed 值保持不变。
+
+
+## E5b：错误对照校准与正式 suite 门禁
+
+```sh
+pnpm eval validate --suite smoke   # Oracle 2/2；检出 2/2；exit 0
+pnpm eval validate --suite fields  # Oracle 5/5；检出 5/5；exit 0
+pnpm eval validate --suite tools   # Oracle 6/6；检出 6/6；exit 0
+pnpm eval validate --suite faults  # 故意注入环境/verifier 异常，校准失败；exit 2
+pnpm eval validate --schema-only   # 仍只做结构校验，不执行、不写凭证
+```
+
+`validate --suite <name>` 不读取 experiment、不调用真实 adapter 或模型。它先快照整个 suite，再逐例运行独立 Oracle 和全部错误对照；不会 fail-fast。每次调用同一个 `evaluate → verify` 路径，使用全新的 workspace/artifacts/verifier 目录，固定初态、prompt、预算与 allowlist 相同，不继承前一个尝试的产物。公开 fixture 原样保留在 case 快照中；沿用 E5a，OracleInput 不携带 stub 的预制答案。错误对照只在独立尝试中写入其声明的产物，不修改公开 fixture，也不从 Oracle 输出补全缺失文件。
+
+错误对照在私有 `acceptance.json.error_examples` 中声明：
+
+```json
+{
+  "answer": "wrong",
+  "reason": "Greeting differs from the task requirement.",
+  "expected_failed_criteria": ["answer-equals"]
+}
+```
+
+可附加 `files: {"config.json": "{...}"}` 或 `files: {"trace.json": "{...}"}`，内容是完整的输出文件文本，且文件必须在 case 的 artifact_allowlist 中；answer.json 由 answer 字段生成，不能通过 files 覆盖。声明的 criterion IDs 必须非空、唯一且指向 hard 条件。只有实际 hard 失败集合**精确等于**声明集合，且 verifier 正常返回 fail，才算成功检出；额外失败、错位失败、意外通过、异常、超时或缺失 verifier 结果均使校准失败。diagnostic 仍记录但不改变 Oracle 通过或错误对照检出，保持 E4a/b/c 的语义。
+
+旧 v2 的 `{answer, reason}` 可继续用于本地执行和 schema-only；正式校准要求补齐 expected_failed_criteria，且至少有一个对照。现有样例已补齐声明（fields/tools 的原对照未提供文件，声明全部因文件缺失而失败的 hard 条件）。`case new` 会生成声明，但 Oracle 仍是故意失败的占位实现。
+
+正式 suite 在 suite.json 添加 `"formal": true`。省略或 false 保持本地草稿行为，smoke/fields/tools/faults 默认仍是本地 suite。正式运行前会校验**全部成员**，`--case`、`--failed-from` 和 Oracle 执行均不能绕过门禁；未通过时退出 2，且不开始 agent run。`case new` 拒绝直接向正式 suite 注册未审核模板。
+
+审核步骤：
+
+1. 在本地 suite 编写 brief、独立 Oracle、验收标准和错误对照。
+2. 执行 `pnpm eval validate --suite <name>`，查看报告中的可解性、检出及对应 artifacts/verifier 证据。
+3. 校准全通过后人工设置 acceptance.json 的 `reviewed: true`，再将 suite 标为 `formal: true`。校准不会替代人工审核，也不会自动更改 reviewed。
+4. 修改后再次校准。仅写 reviewed=true、只跑 Oracle 或只跑 schema-only 都不能产生有效的校准凭证。
+
+每例的 `.calibration.json` 保存通过/失败状态、内容 SHA-256、Oracle 结论、成功检出数、时间和证据路径。哈希覆盖 case 配置、公开 input/fixture/initial_state、验收（不含 reviewed 布尔值）、可选 brief、gold.md、solve.ts 以及校准/执行/verifier 实现。内容变化即失效，不能通过不改 version 或保留 mtime 规避；只切换 reviewed 不改变哈希。每次校准先撤销旧成功凭证；执行中变更文件或中断不能留下本次有效凭证。这是可信本地作者流程的审核记录，不是对恶意篡改凭证的数字签名。凭证应与 case 一起交付；报告/尝试产物保存在 runs-dir，默认 runs/。
+
+校准 run 的 `config.json.kind` 和 `summary.json.kind` 是 calibration；summary 分列 solvability、detection，并固定 `real_agent_attempted: 0`、`real_agent_pass_rate: null`，没有普通 agent 的 pass_rate 字段。`report.md` 分开展示可解性与检出，包含每个对照的预期/实际失败 ID 和证据路径。可用 `pnpm eval report <run-id>` 离线重建。目录为 `cases/<id>/oracle/cases/<id>/...` 与 `cases/<id>/controls/<序号>/cases/<id>/...`，保留现有 evaluator 的完整产物结构。
+
+退出码：0=全部校准通过；1=Oracle 断言失败或对照检出不符合声明；2=配置/执行/环境/verifier 异常或中断（优先级最高）。运行校准只接受 `--suite`、`--cases-dir`、`--runs-dir`，输出目录必须在 cases 根目录之外；schema-only 的参数约束保持不变。
+
+E5b Issue（Notion）：https://app.notion.com/p/405e1347ee978174b338f102244ef8bd 。本票不包含 E6 seeds、真实 jackson-bot adapter、外网模型或 Harbor/Workbench runtime。
