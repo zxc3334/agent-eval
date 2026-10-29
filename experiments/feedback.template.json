@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "hypothesis": "Describe the predicted effect and why it should occur",
+  "requirement_id": "REQ-EXAMPLE",
+  "baseline_run_id": "baseline-run-id",
+  "candidate_run_id": "candidate-run-id",
+  "expected_changes": [
+    "Describe a measurable expected change"
+  ]
+}

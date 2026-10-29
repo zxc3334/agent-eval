@@ -1,10 +1,31 @@
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { identifier, loadCase, readJson, suiteCases } from './config.ts';
 import { json } from './storage.ts';
 import type { Acceptance, CaseConfig } from './types.ts';
 
-export function createCase(casesDir: string, suite: string, id: string, requirementId: string): string {
+export interface FeedbackSource { run_id: string; case_id: string; result_file: string }
+
+export function feedbackSource(runsDir: string, runId: string, caseId: string): { source: FeedbackSource; requirementId: string } {
+  identifier(runId, 'run-id'); identifier(caseId, 'source case');
+  const runDir = resolve(runsDir, runId);
+  const config = readJson(join(runDir, 'config.json'));
+  if (config.run_id !== runId || !Array.isArray(config.case_ids) || !config.case_ids.includes(caseId)) throw new Error('source run: case is not in this run');
+  if (!existsSync(join(runDir, 'manifest.json'))) throw new Error('source run: expected completed run with manifest');
+  const snapshot = Array.isArray(config.cases) ? config.cases.find((c: any) => c?.config?.id === caseId) : undefined;
+  const requirementId = identifier(snapshot?.config?.requirement_id, 'source requirement');
+  const repeat = config.repeat ?? 1;
+  if (!Number.isSafeInteger(repeat) || repeat < 1) throw new Error('source run: invalid repeat');
+  for (let trial = 1; trial <= repeat; trial++) {
+    const file = repeat === 1 ? join(runDir, 'cases', caseId, 'result.json') : join(runDir, 'cases', caseId, 'trials', String(trial), 'result.json');
+    if (!existsSync(file)) continue;
+    const result = readJson(file);
+    if (result.case_id === caseId && result.status === 'fail') return { source: { run_id: runId, case_id: caseId, result_file: file }, requirementId };
+  }
+  throw new Error('source case: no failed result in the run');
+}
+
+export function createCase(casesDir: string, suite: string, id: string, requirementId: string, source?: FeedbackSource): string {
   identifier(suite, 'suite'); identifier(id, 'case'); identifier(requirementId, 'requirement');
   const suiteDir = resolve(casesDir, suite);
   const dir = join(suiteDir, id);
@@ -30,6 +51,7 @@ export function createCase(casesDir: string, suite: string, id: string, requirem
       input: 'input.json', fixture: 'fixture.json', initial_state: 'initial-state.json',
       acceptance: 'acceptance.json', artifact_allowlist: ['answer.json'],
       budgets: { timeout_ms: 2000, max_steps: 1 },
+      ...(source ? { source_evidence: { run_id: source.run_id, case_id: source.case_id, result: 'source-evidence/result.json' } } : {}),
     };
     const acceptance: Acceptance = {
       gold: { answer: 'TODO_EXPECTED_ANSWER' },
@@ -43,6 +65,7 @@ export function createCase(casesDir: string, suite: string, id: string, requirem
     json(join(dir, 'fixture.json'), { answer: 'TODO_STUB_RESPONSE' });
     json(join(dir, 'initial-state.json'), {});
     json(join(dir, 'acceptance.json'), acceptance);
+    if (source) cpSync(dirname(source.result_file), join(dir, 'source-evidence'), { recursive: true });
     writeFileSync(join(dir, 'gold.md'), `# Gold: ${id}
 
 TODO: 根据需求独立编写 solve.ts，解释如何从 initial_state 得到产物。
@@ -62,6 +85,7 @@ writeFileSync('answer.json', JSON.stringify({ answer: 'TODO_REFERENCE_ANSWER', s
 
 requirement_id: ${requirementId}
 case_id: ${id}
+${source ? `\n来源 run: ${source.run_id}; case: ${source.case_id}; [原始失败结果](source-evidence/result.json); [事件](source-evidence/events.jsonl); [产物](source-evidence/artifacts/)\n` : ''}
 
 这是评测者私有的设计材料，不进入 AgentInput。TODO 填完、validate 校准通过并人工检查证据后，才将 acceptance.json 的 reviewed 改为 true。
 
@@ -86,7 +110,16 @@ case_id: ${id}
 `);
     // Reuse the v2 loader before registering the template; this does not execute an adapter.
     loadCase(casesDir, suite, { id, version: config.version });
-    json(suiteFile, { ...manifest, cases: [...manifest.cases, { id, version: config.version }] });
+    let suiteVersion = manifest.version;
+    if (source) {
+      if (suiteVersion === undefined) suiteVersion = '1.0.0';
+      else {
+        const parts = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(suiteVersion);
+        if (!parts || !Number.isSafeInteger(Number(parts[2])) || Number(parts[2]) >= Number.MAX_SAFE_INTEGER) throw new Error('suite version: expected incrementable major.minor.patch');
+        suiteVersion = `${parts[1]}.${Number(parts[2]) + 1}.0`;
+      }
+    }
+    json(suiteFile, { ...manifest, ...(source ? { version: suiteVersion } : {}), cases: [...manifest.cases, { id, version: config.version }] });
     return dir;
   } catch (error) {
     if (created) rmSync(dir, { recursive: true, force: true });

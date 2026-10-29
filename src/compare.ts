@@ -1,7 +1,9 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { identifier, readJson } from './config.ts';
 import { json } from './storage.ts';
+import { localLink, requirementCoverage, type RequirementCoverage } from './coverage.ts';
+import { readExperimentRecord, type ExperimentRecord } from './experiment-record.ts';
 
 type Classification = 'improve' | 'regress' | 'flat' | 'error-change';
 type Difference = { path: string; baseline: unknown; candidate: unknown; declared: boolean; derived?: boolean };
@@ -11,6 +13,7 @@ export interface CompareReport {
   baseline_run: string; candidate_run: string; output_dir: string; variables: string[];
   compatible: boolean; reasons: string[]; differences: Difference[]; cases: CaseComparison[];
   counts: Record<Classification, number>; conclusion: string | null; scope: string; run_faults: string[];
+  requirement_coverage: RequirementCoverage[]; uncovered_cases: string[]; experiment: ExperimentRecord | null; experiment_conclusion: string | null; experiment_evidence: string[];
 }
 
 const allowed = ['model', 'prompt', 'product_revision'];
@@ -37,28 +40,38 @@ function readAttempt(dir: string, caseId: string, trial: number, repeat: number)
     return { trial, status: valid ? r.status : 'invalid_result', assertions: valid ? r.assertions : [], result: file, events: existsSync(events) ? events : null, artifacts: existsSync(artifacts) ? artifacts : null };
   } catch { return { trial, status: 'invalid_result', assertions: [], result: file, events: existsSync(events) ? events : null, artifacts: existsSync(artifacts) ? artifacts : null }; }
 }
-function link(from: string, path: string | null, label: string): string {
+function link(path: string | null, label: string): string {
   if (!path) return `${label}: unavailable`;
-  const target = relative(from, path).replaceAll('\\', '/').split('/').map(encodeURIComponent).join('/');
+  const target = path.split('/').map(encodeURIComponent).join('/');
   return `[${label}](${target})`;
 }
 function markdown(report: CompareReport): string {
   const lines = [`# Compare ${report.baseline_run} → ${report.candidate_run}`, '', `Compatible: ${report.compatible ? 'yes' : 'no'}`, `Scope: ${report.scope}`, `Declared variables: ${report.variables.join(', ') || 'none'}`, `Conclusion: ${report.conclusion ?? 'unavailable'}`, '', '## Compatibility reasons', '', ...(report.reasons.length ? report.reasons.map(reason => `- ${reason}`) : ['- none']), '', '## Configuration differences', ''];
   if (report.run_faults.length) lines.splice(lines.indexOf('## Configuration differences'), 0, '## Run faults', '', ...report.run_faults.map(fault => `- ${fault}`), '');
-  lines.push(...(report.differences.length ? report.differences.map(d => `- ${d.path} (${d.derived ? 'derived' : d.declared ? 'declared variable' : 'undeclared'}): ${JSON.stringify(d.baseline)} → ${JSON.stringify(d.candidate)}`) : ['- none']), '', '## Cases', '');
+  lines.push(...(report.differences.length ? report.differences.map(d => `- ${d.path} (${d.derived ? 'derived' : d.declared ? 'declared variable' : 'undeclared'}): ${JSON.stringify(d.baseline)} → ${JSON.stringify(d.candidate)}`) : ['- none']), '', '## Requirement coverage', '');
+  for (const c of report.requirement_coverage ?? []) lines.push(`- ${c.requirement_id}: ${c.covered ? (c.scored ? 'covered and scored' : 'attempted, not scored') : 'uncovered'}; cases: ${c.case_ids.join(', ')}; not attempted: ${c.uncovered_case_ids.join(', ') || 'none'}; not scored: ${c.unscored_case_ids.join(', ') || 'none'}; ${c.evidence.map(p => localLink(p, 'result')).join(', ') || 'no evidence'}`);
+  if (!report.requirement_coverage?.length) lines.push('- No requirement mappings recorded.');
+  lines.push(`Unmapped cases: ${(report.uncovered_cases ?? []).join(', ') || 'none'}`, '', '## Experiment', '');
+  if (report.experiment) lines.push(`Hypothesis: ${report.experiment.hypothesis}`, `Requirement: ${report.experiment.requirement_id}`, `Expected changes: ${report.experiment.expected_changes.join('; ')}`, `Conclusion: ${report.experiment_conclusion ?? 'unavailable'}`, `Record: ${localLink('experiment.json', 'experiment.json')}`, `Evidence: ${report.experiment_evidence.map(p => localLink(p, 'result')).join(', ') || 'none'}`, '');
+  else lines.push('No experiment record supplied.', '');
+  lines.push('## Cases', '');
   for (const c of report.cases) {
     lines.push(`### ${c.case_id}: ${c.classification}`, '');
     for (const [side, attempts] of [['baseline', c.baseline], ['candidate', c.candidate]] as const) {
-      for (const a of attempts) lines.push(`- ${side} trial ${a.trial}: ${a.status}; ${link(report.output_dir, a.result, 'assertions / result')}; ${link(report.output_dir, a.events, 'trace / events')}; ${link(report.output_dir, a.artifacts, 'artifacts')}`);
+      for (const a of attempts) {
+        lines.push(`- ${side} trial ${a.trial}: ${a.status}; ${link(a.result, 'assertions / result')}; ${link(a.events, 'trace / events')}; ${link(a.artifacts, 'artifacts')}`);
+      }
     }
     lines.push('');
   }
   return lines.join('\n');
 }
 
-export function compareRuns(runsDir: string, baselineId: string, candidateId: string, variables: string[] = []): CompareReport {
+export function compareRuns(runsDir: string, baselineId: string, candidateId: string, variables: string[] = [], experimentFile?: string): CompareReport {
   identifier(baselineId, 'baseline run'); identifier(candidateId, 'candidate run');
   if (variables.some(v => !allowed.includes(v)) || new Set(variables).size !== variables.length) throw new Error(`vary: expected unique values from ${allowed.join(', ')}`);
+  const experiment = experimentFile ? readExperimentRecord(experimentFile) : null;
+  if (experiment && (experiment.baseline_run_id !== baselineId || experiment.candidate_run_id !== candidateId)) throw new Error('experiment record run IDs do not match comparison');
   const root = resolve(runsDir); const dirs = [join(root, baselineId), join(root, candidateId)];
   const configs = dirs.map(dir => readJson(join(dir, 'config.json')));
   const reasons: string[] = []; const differences: Difference[] = []; const run_faults: string[] = [];
@@ -125,7 +138,28 @@ export function compareRuns(runsDir: string, baselineId: string, candidateId: st
   const compatible = !reasons.length; const scope = configs[0].agent === 'jackson-bot-pi' && configs[1].agent === 'jackson-bot-pi' ? 'product adapter' : 'local evaluation pipeline only; not product ability';
   const conclusion = compatible && !counts['error-change'] && !run_faults.length ? `${scope}: ${counts.improve} improved, ${counts.regress} regressed, ${counts.flat} flat cases (pass counts across repeated trials)` : null;
   const output_dir = join(root, 'comparisons', `${baselineId}--${candidateId}`);
-  const report: CompareReport = { baseline_run: baselineId, candidate_run: candidateId, output_dir, variables, compatible, reasons, differences, cases, counts, conclusion, scope, run_faults };
-  mkdirSync(output_dir, { recursive: true }); json(join(output_dir, 'compare.json'), report); writeFileSync(join(output_dir, 'compare.md'), markdown(report));
+  mkdirSync(output_dir, { recursive: true });
+  const evidenceDir = join(output_dir, 'evidence'); rmSync(evidenceDir, { recursive: true, force: true });
+  for (let i = 0; i < dirs.length; i++) cpSync(dirs[i], join(evidenceDir, i ? 'candidate' : 'baseline'), { recursive: true });
+  for (const c of cases) for (const [side, attempts] of [['baseline', c.baseline], ['candidate', c.candidate]] as const) for (const a of attempts) {
+    const original = side === 'baseline' ? dirs[0] : dirs[1];
+    for (const key of ['result', 'events', 'artifacts'] as const) if (a[key]) a[key] = `evidence/${side}/${relative(original, a[key]!).replaceAll('\\', '/')}`;
+  }
+  const coverage = requirementCoverage(dirs[1], configs[1]);
+  for (const c of coverage.requirement_coverage) c.evidence = c.evidence.map(path => `evidence/candidate/${path}`);
+  const selected = experiment && coverage.requirement_coverage.find(c => c.requirement_id === experiment.requirement_id);
+  const targetCases = selected ? cases.filter(c => selected.case_ids.includes(c.case_id)) : [];
+  const experiment_evidence = targetCases.flatMap(c => [...c.baseline, ...c.candidate].flatMap(a => a.result ? [a.result] : []));
+  const experiment_conclusion = experiment ? (!compatible || run_faults.length || !targetCases.length || targetCases.length !== selected?.case_ids.length || selected.unscored_case_ids.length > 0 || targetCases.some(c => c.classification === 'error-change') ? 'unavailable: incompatible comparison or missing scored evidence for this requirement' : `${experiment.requirement_id}: ${targetCases.filter(c => c.classification === 'improve').length} improved, ${targetCases.filter(c => c.classification === 'regress').length} regressed, ${targetCases.filter(c => c.classification === 'flat').length} flat cases; review expected changes against the evidence`) : null;
+  const report: CompareReport = { baseline_run: baselineId, candidate_run: candidateId, output_dir, variables, compatible, reasons, differences, cases, counts, conclusion, scope, run_faults, ...coverage, experiment, experiment_conclusion, experiment_evidence };
+  if (experiment) json(join(output_dir, 'experiment.json'), experiment);
+  else rmSync(join(output_dir, 'experiment.json'), { force: true });
+  json(join(output_dir, 'compare.json'), { ...report, output_dir: '.' }); writeFileSync(join(output_dir, 'compare.md'), markdown(report));
   return report;
+}
+
+/** Re-render a saved comparison without reading the original runs or invoking an agent. */
+export function regenerateComparison(dir: string): void {
+  const report = readJson(join(dir, 'compare.json')) as CompareReport;
+  writeFileSync(join(dir, 'compare.md'), markdown(report));
 }

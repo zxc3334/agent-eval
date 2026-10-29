@@ -51,6 +51,7 @@ export interface CaseConfig {
   schema_version: 2; id: string; version: string; type: 'positive' | 'negative';
   // Optional for existing v2 cases; authoring metadata never enters AgentInput.
   requirement_id?: string; brief?: string;
+  source_evidence?: { run_id: string; case_id: string; result: string };
   input: string; fixture: string; initial_state: string; acceptance: string;
   artifact_allowlist: string[]; budgets: Budgets;
   clock?: string; execution?: ContainerExecution;

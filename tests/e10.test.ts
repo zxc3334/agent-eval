@@ -45,9 +45,9 @@ test('fixed results report pass-to-fail, fail-to-pass, unchanged and run fault w
     const markdown = readFileSync(join(dir, 'compare.md'), 'utf8');
     for (const side of ['baseline', 'candidate']) {
       for (const path of ['result.json', 'events.jsonl', 'artifacts']) {
-        const expected = join(t.runs, side, 'cases', 'regression', path);
+        const expected = join(dir, 'evidence', side, 'cases', 'regression', path);
         assert.ok(existsSync(expected));
-        assert.ok(markdown.includes(expected) || markdown.includes(expected.replace(t.runs + '/', '../../')), `${side} ${path} is linked in report`);
+        assert.ok(markdown.includes(`evidence/${side}/cases/regression/${path}`), `${side} ${path} is linked in report`);
       }
     }
   } finally { t.close(); }
@@ -189,8 +189,8 @@ test('real repeated runs compare all trials and report a missing trial as a run 
     assert.equal(read(join(compareDir, 'compare.json')).cases[0].classification, 'regress');
     const markdown = readFileSync(join(compareDir, 'compare.md'), 'utf8');
     const links = [...markdown.matchAll(/\]\(([^)]+)\)/g)].map(match => resolve(compareDir, decodeURIComponent(match[1])));
-    for (const id of dirs) for (const trial of [1, 2]) for (const name of ['result.json', 'events.jsonl', 'artifacts']) {
-      const target = join(t.runs, id, 'cases/smoke-pass/trials', String(trial), name);
+    for (const side of ['baseline', 'candidate']) for (const trial of [1, 2]) for (const name of ['result.json', 'events.jsonl', 'artifacts']) {
+      const target = join(compareDir, 'evidence', side, 'cases/smoke-pass/trials', String(trial), name);
       assert.ok(links.includes(target), `missing link to ${target}`);
       assert.ok(existsSync(target), `broken link to ${target}`);
     }

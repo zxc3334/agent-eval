@@ -5,7 +5,7 @@ import { run } from './runner.ts';
 import { watch } from './watch.ts';
 import { generateReport } from './report.ts';
 import { identifier, readJson } from './config.ts';
-import { createCase } from './scaffold.ts';
+import { createCase, feedbackSource } from './scaffold.ts';
 import { validateSchema } from './validation.ts';
 import { validateSuite } from './calibration.ts';
 import { generateCalibrationReport } from './calibration-report.ts';
@@ -17,8 +17,8 @@ try {
   const { values, positionals, tokens } = parseArgs({ allowPositionals: true, tokens: true, options: {
     suite: { type: 'string' }, agent: { type: 'string' },
     case: { type: 'string' }, 'cases-dir': { type: 'string' },
-    experiment: { type: 'string' }, vary: { type: 'string', multiple: true },
-    requirement: { type: 'string' },
+    experiment: { type: 'string' }, 'experiment-record': { type: 'string' }, vary: { type: 'string', multiple: true },
+    requirement: { type: 'string' }, 'from-run': { type: 'string' },
     'schema-only': { type: 'boolean', default: false },
     'runs-dir': { type: 'string', default: 'runs' }, 'failed-from': { type: 'string' },
     rerun: { type: 'string' }, repeat: { type: 'string' },
@@ -26,7 +26,7 @@ try {
     help: { type: 'boolean', default: false },
   } });
   if (values.help) {
-    console.log('Usage: pnpm eval [--suite smoke] [--agent stub|oracle|container|jackson-bot-pi] [--experiment <json>] [--case <id> | --failed-from <run-id> | --rerun <run-id>] [--repeat N] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\n       pnpm eval baseline set <run-id> [--runs-dir <path>]\n       pnpm eval compare <baseline-run> <candidate-run> [--vary model|prompt|product_revision] [--runs-dir <path>]\n       pnpm eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --schema-only [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --suite <name> [--cases-dir <path>] [--runs-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=success/all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
+    console.log('Usage: pnpm eval [--suite smoke] [--agent stub|oracle|container|jackson-bot-pi] [--experiment <json>] [--case <id> | --failed-from <run-id> | --rerun <run-id>] [--repeat N] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\n       pnpm eval baseline set <run-id> [--runs-dir <path>]\n       pnpm eval compare <baseline-run> <candidate-run> [--vary model|prompt|product_revision] [--experiment-record <path>] [--runs-dir <path>]\n       pnpm eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]\n       pnpm eval case new <id> --from-run <run-id> --case <source-id> [--suite smoke] [--cases-dir <path>] [--runs-dir <path>]\n       pnpm eval validate --schema-only [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --suite <name> [--cases-dir <path>] [--runs-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=success/all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
   } else if (positionals[0] === 'baseline') {
     if (positionals.length !== 3 || positionals[1] !== 'set') throw new Error('usage: eval baseline set <run-id> [--runs-dir <path>]');
     for (const token of tokens) {
@@ -37,10 +37,10 @@ try {
   } else if (positionals[0] === 'compare') {
     if (positionals.length !== 3) throw new Error('usage: eval compare <baseline-run> <candidate-run> [--vary model|prompt|product_revision] [--runs-dir <path>]');
     for (const token of tokens) {
-      if (token.kind === 'option' && !['runs-dir', 'vary'].includes(token.name)) throw new Error(`compare: unsupported option --${token.name}`);
+      if (token.kind === 'option' && !['runs-dir', 'vary', 'experiment-record'].includes(token.name)) throw new Error(`compare: unsupported option --${token.name}`);
     }
     const { compareRuns } = await import('./compare.ts');
-    const comparison = compareRuns(resolve(values['runs-dir']!), positionals[1], positionals[2], values.vary ?? []);
+    const comparison = compareRuns(resolve(values['runs-dir']!), positionals[1], positionals[2], values.vary ?? [], values['experiment-record']);
     console.log(`Comparison: ${comparison.compatible ? 'compatible' : 'incompatible'}`);
     for (const reason of comparison.reasons) console.log(`  ${reason}`);
     for (const difference of comparison.differences) console.log(`  ${difference.path} [${difference.derived ? 'derived' : difference.declared ? 'declared variable' : 'undeclared'}]: ${JSON.stringify(difference.baseline)} -> ${JSON.stringify(difference.candidate)}`);
@@ -69,27 +69,34 @@ try {
       try { process.exitCode = (await validateSuite(casesDir, suite, resolve(values['runs-dir']!), controller.signal)).code; }
       finally { process.off('SIGINT', stop); process.off('SIGTERM', stop); }
     }
+  } else if (values['experiment-record'] !== undefined) {
+    throw new Error('--experiment-record is only supported by eval compare');
   } else if (values.vary !== undefined) {
     throw new Error('--vary is only supported by eval compare');
   } else if (values['schema-only']) {
     throw new Error('--schema-only is only supported by eval validate');
   } else if (positionals[0] === 'case') {
-    if (positionals[1] !== 'new' || positionals.length !== 3 || !values.requirement) throw new Error('usage: eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]');
+    if (positionals[1] !== 'new' || positionals.length !== 3 || (values['from-run'] ? !values.case || values.requirement !== undefined : !values.requirement || values.case !== undefined)) throw new Error('usage: eval case new <id> --requirement <id> | --from-run <run-id> --case <source-id> [--suite smoke] [--cases-dir <path>] [--runs-dir <path>]');
     for (const token of tokens) {
-      if (token.kind === 'option' && !['requirement', 'suite', 'cases-dir'].includes(token.name)) throw new Error(`case new: unsupported option --${token.name}`);
+      if (token.kind === 'option' && !['requirement', 'suite', 'cases-dir', ...(values['from-run'] ? ['from-run', 'case', 'runs-dir'] : [])].includes(token.name)) throw new Error(`case new: unsupported option --${token.name}`);
     }
-    const dir = createCase(values['cases-dir'] ?? 'cases', values.suite ?? 'smoke', positionals[2], values.requirement);
+    const feedback = values['from-run'] ? feedbackSource(values['runs-dir']!, values['from-run'], values.case!) : undefined;
+    const dir = createCase(values['cases-dir'] ?? 'cases', values.suite ?? 'smoke', positionals[2], feedback?.requirementId ?? values.requirement!, feedback?.source);
     console.log(`Created case: ${dir}\nBrief: ${join(dir, 'brief.md')}\nRegistered version 1.0.0 in suite ${values.suite ?? 'smoke'}.\nTODO: fill brief, public inputs, private acceptance, gold.md and solve.ts; reviewed=false. The placeholder intentionally fails (exit 1).`);
   } else if (values.requirement !== undefined) {
     throw new Error('--requirement is only supported by eval case new');
+  } else if (values['from-run'] !== undefined) {
+    throw new Error('--from-run is only supported by eval case new');
   } else if (positionals[0] === 'report' && positionals.length === 2) {
     const dir = resolve(values['runs-dir']!, identifier(positionals[1], 'run-id'));
-    if (readJson(join(dir, 'config.json')).kind === 'calibration') generateCalibrationReport(dir);
+    if (existsSync(join(dir, 'compare.json'))) {
+      const { regenerateComparison } = await import('./compare.ts'); regenerateComparison(dir);
+    } else if (readJson(join(dir, 'config.json')).kind === 'calibration') generateCalibrationReport(dir);
     else {
       generateReport(dir);
       if (existsSync(join(dir, 'manifest.json'))) writeManifest(dir, readJson(join(dir, 'manifest.json')));
     }
-    console.log(`Report: ${dir}/report.md`);
+    console.log(`Report: ${dir}/${existsSync(join(dir, 'compare.json')) ? 'compare.md' : 'report.md'}`);
   } else {
     if (positionals.length) throw new Error('usage: eval [options] | eval report <run-id> | eval case new <id> --requirement <id>');
     if (values.agent !== undefined && !['stub', 'oracle', 'container', 'jackson-bot-pi'].includes(values.agent)) throw new Error('agent: only stub, oracle, container and jackson-bot-pi are supported');

@@ -1,4 +1,5 @@
 import { loadCase, suiteCases } from './config.ts';
+import { requireFeedbackReview } from './review.ts';
 
 export interface ValidationResult {
   checked: number;
@@ -12,7 +13,7 @@ export function validateSchema(casesDir: string, suite: string): ValidationResul
   try {
     for (const ref of suiteCases(casesDir, suite)) {
       result.checked++;
-      try { loadCase(casesDir, suite, ref); }
+      try { requireFeedbackReview(loadCase(casesDir, suite, ref)); }
       catch (error) { result.errors.push((error as Error).message); }
     }
   } catch (error) { result.errors.push((error as Error).message); }
