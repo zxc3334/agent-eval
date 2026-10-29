@@ -1,6 +1,6 @@
-# agent-eval · 本地冒烟、Case schema v2 与脚手架
+# agent-eval · 本地冒烟、Case schema v2 与校验
 
-独立 TypeScript 评测仓库。当前只测本地确定性 **stub**，不代表 jackson-bot 的能力；真实产品以后仅经 adapter 接入。已含 E0/E1/E2 与 E3a schema v2，本波增加 E3b brief 与 case 脚手架，不接模型，不需要 API key、Docker 或 bot。
+独立 TypeScript 评测仓库。当前只测本地确定性 **stub**，不代表 jackson-bot 的能力；真实产品以后仅经 adapter 接入。已含 E0/E1/E2、E3a schema v2、E3b brief 与 case 脚手架，本波增加 E3c schema-only 校验与 AgentInput 防泄漏测试，不接模型，不需要 API key、Docker 或 bot。
 
 ## 安装与第一轮
 
@@ -138,6 +138,27 @@ pnpm eval --suite local --case greeting --cases-dir /tmp/my-eval-cases --agent s
 
 创建时使用 suite 内 `.case-new.lock` 防止多个脚手架写入者丢失引用，正常结束和报错都会释放。若进程被强制杀死，请确认没有创建进程在运行后，检查遗留 case 目录/清单，再手动删除锁并重试。未提供强制覆盖、自动需求拉取、自动 suite 升版或内容完整性审核；case 内容版本变化仍需同步修改 suite 中的精确版本。
 
+## 只校验文件（E3c）
+
+```sh
+pnpm eval validate --schema-only
+pnpm eval validate --schema-only --suite faults
+pnpm eval validate --schema-only --suite local --cases-dir /tmp/my-eval-cases
+```
+
+默认检查 `cases/smoke/suite.json` 引用的全部 case，支持 `--suite` 与 `--cases-dir`。复用执行前的 v2 loader，检查重复 case/criteria ID、文件存在且为普通文件、精确版本与 ID 引用、路径边界和合法预算。成功退出 0，配置错误退出 2；输出文件、字段、原因和 `fix:` 修复提示，例如：
+
+```text
+schema_error: /.../case.json: budgets.timeout_ms: expected integer 1..300000; fix: update budgets.timeout_ms to satisfy this requirement
+Schema-only smoke: checked 2 case(s), 1 error(s).
+```
+
+清单无效时停止遍历；清单有效时继续检查全部引用，每个 case 报首个错误，修复后可再次校验。不扫描未注册目录，case ID 在各 suite 内唯一，criteria ID 在本例内唯一。缺文件诊断指出引用字段及目标路径，JSON 解析失败指出出错文件的 `JSON/read` 字段。
+
+此命令不读取实验配置、不启动 adapter、不执行 verifier/Gold/隐藏测试、不写 run 或报告；`reviewed: false` 和尚未填写的 E3b 模板仍可通过结构校验。结构通过不表示答案正确。运行类参数（如 `--agent`、`--experiment`、`--watch`、`--case`、`--runs-dir`）会被拒绝，避免误以为它们生效。
+
+路径检查同时检查相对路径和符号链接解析后的边界：suite 在 cases 根内，case 在所属 suite 内，文件在所属 case 内。公开 input/fixture/initial_state 不得指向私有 acceptance/brief 的同一文件（含符号链接与硬链接）。防泄漏测试在私有 Gold、隐藏测试、counterexamples 及路径中注入独立标记，并检查 loader 对象及真正写给 stub 的 `workspace/input.json`；私有元数据不会通过对象展开进入 payload。隐藏测试仅作为私有扩展元数据测试隔离，不新增隐藏测试格式或执行器。公开 prompt、fixture.answer、initial_state 仍由作者负责；不会扫描自然语言内容、任意 JSON 值或推断手工复制的私有答案，也不提供宿主文件访问沙箱。
+
 ## 改 case 并单例重跑
 
 ```sh
@@ -175,7 +196,7 @@ pnpm eval --help
 
 ## 本波边界
 
-本波只在已有 E3a 本地协议链路上增加 E3b case new/brief。借鉴 Harbor 的独立 verifier/产物分离与 Workbench 的需求→case→证据，不采用二者 runtime。不实现 E3c validate --schema-only/完整防泄漏审计、E4+ 新 verifier、Gold/Oracle 校准、真实 adapter、baseline 对比、公共榜、云并行、线上 QQ 或默认 LLM judge。
+本波只在已有 E3a loader / E3b scaffold 上增加 E3c schema-only 校验与 AgentInput 防泄漏测试。借鉴 Harbor 的独立 verifier/产物分离与 Workbench 的需求→case→证据，不采用二者 runtime。不实现 E4+ 新 verifier、Gold/Oracle 校准、真实 adapter、baseline 对比、公共榜、云并行、线上 QQ 或默认 LLM judge。
 
 本机验收是 macOS arm64；Linux 使用相同 POSIX 机制但尚未实机验证，Windows 不支持本波进程组清理。不可捕获的 SIGKILL/断电不保证最后一份报告已写完；已写入的证据保留。stub 进程隔离用于生命周期管理，不是执行不可信代码的安全沙箱。
 
@@ -189,3 +210,4 @@ pnpm eval --help
 - E2：https://app.notion.com/405e1347ee978176b77cc486100195d8
 - E3a：https://app.notion.com/p/405e1347ee97813e9172d527cf9a96e9
 - E3b：https://app.notion.com/p/405e1347ee9781cda55ce3b07a09388f
+- E3c：https://app.notion.com/p/405e1347ee97817c90f8f782dbfd8902
