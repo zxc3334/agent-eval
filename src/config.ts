@@ -1,4 +1,4 @@
-import { readFileSync, realpathSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { resolve, dirname, relative, isAbsolute, sep, win32 } from 'node:path';
 import type { LoadedCase, CaseConfig, CaseRef, Acceptance, AgentInput, ExperimentConfig } from './types.ts';
 import { normalizeCriteria } from './criteria.ts';
@@ -80,11 +80,13 @@ export function loadCase(casesDir: string, suite: string, ref: CaseRef): LoadedC
   if (raw.inject !== undefined && !['agent_error', 'protocol_error', 'timeout', 'verifier_error', 'verifier_timeout', 'verifier_missing', 'verifier_invalid', 'environment_error'].includes(raw.inject)) bad('inject', 'unknown fault');
   const dir = dirname(file);
   const acceptanceFile = localFile(dir, raw.acceptance, 'acceptance');
-  const privateFiles = [acceptanceFile, ...(briefFile ? [briefFile] : [])].map(path => statSync(path));
+  const goldFiles = ['gold.md', 'solve.ts'].filter(name => existsSync(resolve(dir, name)))
+    .map(name => localFile(dir, name, `oracle.${name}`));
+  const privateFiles = [acceptanceFile, ...(briefFile ? [briefFile] : []), ...goldFiles].map(path => statSync(path));
   const publicFile = (field: 'input' | 'fixture' | 'initial_state'): string => {
     const path = localFile(dir, raw[field], field);
     const info = statSync(path);
-    if (privateFiles.some(privateInfo => privateInfo.dev === info.dev && privateInfo.ino === info.ino)) bad(field, 'public reference aliases private acceptance/brief; use a separate public file');
+    if (privateFiles.some(privateInfo => privateInfo.dev === info.dev && privateInfo.ino === info.ino)) bad(field, 'public reference aliases private acceptance/brief/gold; use a separate public file');
     return path;
   };
   const publicInput = readJson(publicFile('input'));
@@ -119,7 +121,7 @@ export function loadCase(casesDir: string, suite: string, ref: CaseRef): LoadedC
 }
 export function loadExperiment(file: string): ExperimentConfig {
   const raw = readJson(file);
-  if (raw?.adapter !== 'stub') throw new Error(`${file}: adapter: only stub is supported`);
+  if (!['stub', 'oracle'].includes(raw?.adapter)) throw new Error(`${file}: adapter: only stub and oracle are supported`);
   if (raw.model !== null && (typeof raw.model !== 'string' || !raw.model.trim())) throw new Error(`${file}: model: expected string or null`);
   if (!object(raw.product)) throw new Error(`${file}: product: expected JSON object`);
   return { adapter: raw.adapter, model: raw.model, product: raw.product };

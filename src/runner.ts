@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, appendFileSync, copyFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, appendFileSync, copyFileSync, existsSync, lstatSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -8,9 +8,11 @@ import { invokeStub } from './process.ts';
 import { generateReport } from './report.ts';
 import { normalizeCriteria } from './criteria.ts';
 import { verify } from './verifier.ts';
+import { invokeOracle, loadGold, oracleInput } from './oracle.ts';
+import type { GoldSource } from './oracle.ts';
 import type { LoadedCase, Options, Result } from './types.ts';
 
-async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal): Promise<Result> {
+async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal, gold?: GoldSource): Promise<Result> {
   const start = performance.now(); const caseDir = join(dir, 'cases', c.config.id);
   const workspace = join(caseDir, 'workspace'); const artifacts = join(caseDir, 'artifacts');
   mkdirSync(workspace, { recursive: true }); mkdirSync(artifacts);
@@ -19,22 +21,30 @@ async function evaluate(c: LoadedCase, dir: string, signal: AbortSignal): Promis
   for (const name of ['stdout.log', 'stderr.log']) writeFileSync(join(artifacts, name), '');
   const result: Result = { case_id: c.config.id, status: 'environment_error', assertions: [], duration_ms: 0, events };
   let stage = 'prepare'; let temp: string | undefined;
+  const executor = gold ? 'oracle' : 'stub';
   event('case_start', { case_id: c.config.id });
   try {
     json(join(caseDir, 'snapshot.json'), c);
     if (c.config.inject === 'environment_error') throw new Error('injected workspace preparation failure');
     temp = mkdtempSync(join(tmpdir(), 'agent-eval-'));
-    json(join(workspace, 'input.json'), c.input);
-    stage = 'agent'; event('agent_start', { agent: 'stub', ...c.input.budgets });
-    const outcome = await invokeStub(workspace, artifacts, temp, c.input.budgets.timeout_ms, c.config.inject, signal);
+    const input = gold ? oracleInput(c.input) : c.input;
+    json(join(workspace, 'input.json'), input);
+    stage = 'agent'; event('agent_start', { agent: executor, ...c.input.budgets });
+    const outcome = gold
+      ? await invokeOracle(gold, input, caseDir, workspace, artifacts, temp, signal)
+      : await invokeStub(workspace, artifacts, temp, c.input.budgets.timeout_ms, c.config.inject, signal);
     for (const name of c.input.artifact_allowlist) {
-      if (existsSync(join(workspace, name))) copyFileSync(join(workspace, name), join(artifacts, name));
+      const file = join(workspace, name);
+      if (existsSync(file)) {
+        if (!lstatSync(file).isFile()) throw new Error(`artifact ${name}: expected regular file, not a link or directory`);
+        copyFileSync(file, join(artifacts, name));
+      }
     }
     if (signal.aborted) { result.status = 'environment_error'; throw new Error('interrupted by signal'); }
     if (outcome.timedOut) { result.status = 'timeout'; throw new Error(`budget exceeded (${c.input.budgets.timeout_ms}ms)`); }
     if (outcome.error) { result.status = 'environment_error'; throw new Error(outcome.error); }
     result.status = 'agent_error';
-    if (outcome.code !== 0) throw new Error(`stub exited with code ${outcome.code}`);
+    if (outcome.code !== 0) throw new Error(`${executor} exited with code ${outcome.code}; see artifacts/stderr.log`);
     stage = 'protocol';
     const response = readJson(join(artifacts, 'answer.json'));
     if (!response || !Object.hasOwn(response, 'answer')) throw new Error('answer.json: answer: required');
@@ -67,6 +77,8 @@ export async function run(options: Options, signal: AbortSignal = new AbortContr
   const cases = ids.map(id => loadCase(options.casesDir, options.suite, refs.find(ref => ref.id === id)!));
   const experiment = loadExperiment(options.experimentFile);
   if (options.agent !== experiment.adapter) throw new Error(`agent: ${options.agent} does not match experiment adapter ${experiment.adapter}`);
+  // Snapshot all selected reference sources before starting any execution.
+  const golds = options.agent === 'oracle' ? cases.map(c => loadGold(c.file)) : [];
   const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID()}`;
   const dir = join(options.runsDir, runId); mkdirSync(dir, { recursive: true });
   const configSource = `${options.casesDir} (current files; suite=${options.suite})`;
@@ -74,9 +86,9 @@ export async function run(options: Options, signal: AbortSignal = new AbortContr
   console.log(`Run ${runId}\nRun directory: ${dir}\nConfiguration source: ${configSource}\nSource run: ${options.sourceRunId ?? 'none'}`);
   let error: string | undefined;
   try {
-    for (const c of cases) {
+    for (const [index, c] of cases.entries()) {
       if (signal.aborted) break;
-      const result = await evaluate(c, dir, signal);
+      const result = await evaluate(c, dir, signal, golds[index]);
       console.log(`${result.status.toUpperCase()} ${result.case_id} ${result.duration_ms}ms`);
       for (const a of result.assertions.filter(a => !a.passed)) console.log(`  ${a.criterion_id} [${a.mode}]: expected=${JSON.stringify(a.expected)} actual=${JSON.stringify(a.actual)}\n  reason: ${a.reason}${a.problem ? `\n  problem: ${a.problem}` : ''}\n  artifact: ${a.artifact}`);
       if (result.reason) console.log(`  stage=${result.stage}: ${result.reason}\n  events: ${result.events}`);

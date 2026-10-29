@@ -11,7 +11,7 @@ import type { Options } from './types.ts';
 
 try {
   const { values, positionals, tokens } = parseArgs({ allowPositionals: true, tokens: true, options: {
-    suite: { type: 'string' }, agent: { type: 'string', default: 'stub' },
+    suite: { type: 'string' }, agent: { type: 'string' },
     case: { type: 'string' }, 'cases-dir': { type: 'string' },
     experiment: { type: 'string' },
     requirement: { type: 'string' },
@@ -21,7 +21,7 @@ try {
     help: { type: 'boolean', default: false },
   } });
   if (values.help) {
-    console.log('Usage: pnpm eval [--suite smoke] [--agent stub] [--experiment <json>] [--case <id> | --failed-from <run-id>] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\n       pnpm eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --schema-only [--suite smoke] [--cases-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=success/all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
+    console.log('Usage: pnpm eval [--suite smoke] [--agent stub|oracle] [--experiment <json>] [--case <id> | --failed-from <run-id>] [--watch] [--fail-fast]\n       pnpm eval report <run-id> [--runs-dir <path>]\n       pnpm eval case new <id> --requirement <id> [--suite smoke] [--cases-dir <path>]\n       pnpm eval validate --schema-only [--suite smoke] [--cases-dir <path>]\nPaths: --cases-dir <path> --runs-dir <path>\nExit: 0=success/all pass, 1=assertion failure, 2=config/runtime failure (highest priority).');
   } else if (positionals[0] === 'validate') {
     if (positionals.length !== 1 || !values['schema-only']) throw new Error('usage: eval validate --schema-only [--suite smoke] [--cases-dir <path>]');
     for (const token of tokens) {
@@ -40,7 +40,7 @@ try {
       if (token.kind === 'option' && !['requirement', 'suite', 'cases-dir'].includes(token.name)) throw new Error(`case new: unsupported option --${token.name}`);
     }
     const dir = createCase(values['cases-dir'] ?? 'cases', values.suite ?? 'smoke', positionals[2], values.requirement);
-    console.log(`Created case: ${dir}\nBrief: ${join(dir, 'brief.md')}\nRegistered version 1.0.0 in suite ${values.suite ?? 'smoke'}.\nTODO: fill brief, public inputs and private acceptance; reviewed=false. The placeholder intentionally fails (exit 1).`);
+    console.log(`Created case: ${dir}\nBrief: ${join(dir, 'brief.md')}\nRegistered version 1.0.0 in suite ${values.suite ?? 'smoke'}.\nTODO: fill brief, public inputs, private acceptance, gold.md and solve.ts; reviewed=false. The placeholder intentionally fails (exit 1).`);
   } else if (values.requirement !== undefined) {
     throw new Error('--requirement is only supported by eval case new');
   } else if (positionals[0] === 'report' && positionals.length === 2) {
@@ -48,7 +48,7 @@ try {
     generateReport(dir); console.log(`Report: ${dir}/report.md`);
   } else {
     if (positionals.length) throw new Error('usage: eval [options] | eval report <run-id> | eval case new <id> --requirement <id>');
-    if (values.agent !== 'stub') throw new Error('agent: only stub is supported in M0');
+    if (values.agent !== undefined && !['stub', 'oracle'].includes(values.agent)) throw new Error('agent: only stub and oracle are supported');
     if (values.case && values['failed-from']) throw new Error('case and failed-from are mutually exclusive');
     const runsDir = resolve(values['runs-dir']!);
     let source: any; let selectedIds: string[] | undefined;
@@ -62,11 +62,12 @@ try {
         return !existsSync(file) || readJson(file).status !== 'pass';
       });
     }
+    const agent = values.agent ?? source?.agent ?? 'stub';
     const options: Options = {
-      suite: identifier(values.suite ?? source?.suite ?? 'smoke', 'suite'), agent: values.agent!,
+      suite: identifier(values.suite ?? source?.suite ?? 'smoke', 'suite'), agent,
       caseId: values.case ? identifier(values.case, 'case') : undefined,
       casesDir: resolve(values['cases-dir'] ?? source?.cases_dir ?? 'cases'), runsDir,
-      experimentFile: resolve(values.experiment ?? source?.experiment_file ?? 'experiments/stub.json'),
+      experimentFile: resolve(values.experiment ?? (source?.agent === agent ? source?.experiment_file : undefined) ?? `experiments/${agent}.json`),
       watch: values.watch!, failFast: values['fail-fast']!, selectedIds, sourceRunId,
     };
     if (options.runsDir === options.casesDir || options.runsDir === join(options.casesDir, options.suite)
