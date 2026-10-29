@@ -1,0 +1,1 @@
+{ "id": "smoke-pass", "input": "input.json", "fixture": "fixture.json", "acceptance": "acceptance.json", "timeout_ms": 2000 }

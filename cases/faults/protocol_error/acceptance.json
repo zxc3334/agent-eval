@@ -1,0 +1,1 @@
+{ "criteria": [{ "id": "answer-equals", "type": "equals", "expected": "hello" }] }
