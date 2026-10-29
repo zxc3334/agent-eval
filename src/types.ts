@@ -1,5 +1,11 @@
 export type Status = 'pass' | 'fail' | 'agent_error' | 'timeout' | 'verifier_error' | 'environment_error';
-export interface Criterion { id: string; type: 'equals'; expected: unknown }
+export interface LegacyCriterion { id: string; type: 'equals'; expected: unknown }
+export interface EvidenceRef { artifact: string; field: string }
+export interface Criterion {
+  id: string; type: 'equals'; target: { artifact: 'answer.json'; field: 'answer' };
+  params: { expected: unknown }; mode: 'hard' | 'diagnostic'; reason: string;
+}
+export type VerifierFault = 'verifier_error' | 'verifier_timeout' | 'verifier_missing' | 'verifier_invalid';
 export interface Budgets { timeout_ms: number; max_steps: number }
 export interface Fixture { answer: unknown; delay_ms?: number }
 // The complete adapter-facing payload. Never spread a LoadedCase into this object.
@@ -12,7 +18,7 @@ export interface AgentInput {
 }
 export interface Acceptance {
   gold: { answer: unknown };
-  criteria: Criterion[];
+  criteria: (Criterion | LegacyCriterion)[];
   error_examples: { answer: unknown; reason: string }[];
   reviewed: boolean;
 }
@@ -23,7 +29,7 @@ export interface CaseConfig {
   requirement_id?: string; brief?: string;
   input: string; fixture: string; initial_state: string; acceptance: string;
   artifact_allowlist: string[]; budgets: Budgets;
-  inject?: 'agent_error' | 'protocol_error' | 'timeout' | 'verifier_error' | 'environment_error';
+  inject?: 'agent_error' | 'protocol_error' | 'timeout' | VerifierFault | 'environment_error';
 }
 export interface LoadedCase {
   config: CaseConfig; file: string; input: AgentInput; acceptance: Acceptance;
@@ -34,10 +40,12 @@ export interface ExperimentConfig {
 }
 export interface Assertion {
   criterion_id: string; expected: unknown; actual: unknown; passed: boolean; artifact: string;
+  type: Criterion['type']; target: Criterion['target']; params: Criterion['params'];
+  mode: Criterion['mode']; reason: string; evidence: EvidenceRef[];
 }
 export interface Result {
   case_id: string; status: Status; duration_ms: number; assertions: Assertion[];
-  stage?: string; reason?: string; events: string;
+  stage?: string; reason?: string; events: string; verifier_result_dir?: string;
 }
 export interface Options {
   suite: string; agent: string; casesDir: string; runsDir: string; caseId?: string;

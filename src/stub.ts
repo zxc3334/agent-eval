@@ -1,4 +1,5 @@
-// One-step adapter protocol: read public AgentInput, write { answer }.
+// One-step adapter protocol: read public AgentInput, write { answer, success }.
+// success only reports that the adapter produced an answer; it is never a grade.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
@@ -19,5 +20,5 @@ if (mode === 'timeout') {
 if (mode === 'agent_error') { console.error('stub: injected agent crash'); process.exit(17); }
 if (mode === 'protocol_error') { writeFileSync('answer.json', '{broken protocol'); process.exit(0); }
 if (fixture.delay_ms) await new Promise(resolve => setTimeout(resolve, fixture.delay_ms));
-writeFileSync('answer.json', JSON.stringify({ answer: fixture.answer }));
+writeFileSync('answer.json', JSON.stringify({ answer: fixture.answer, success: true }));
 console.log('stub: answer written');
