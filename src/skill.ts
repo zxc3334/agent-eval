@@ -64,17 +64,25 @@ export function injectSkill(skill: LoadedSkill, workspace: string, mode: 'metada
 export async function runSkillMatrix(matrix: SkillMatrixConfig, baseRunsDir: string): Promise<SkillMatrixReport> {
   const casesDir = resolve(matrix.cases_dir ?? 'cases');
   const runsDir = resolve(matrix.runs_dir ?? baseRunsDir);
+  const agent = matrix.agent ?? (matrix as any).adapter ?? 'stub';
+  const sut = matrix.sut ?? (matrix.candidate_skill_dir ? { name: matrix.skill ?? 'candidate-skill', path: matrix.candidate_skill_dir } : undefined);
+  if (!sut) throw new Error('SkillMatrixConfig requires sut: { name, path } or candidate_skill_dir');
+  const baseline = matrix.baseline !== undefined ? matrix.baseline : (matrix.baseline_skill_dir ? { name: `${sut.name}-baseline`, path: matrix.baseline_skill_dir } : null);
+
+  const experimentFile = existsSync(resolve(`experiments/${agent}.json`))
+    ? resolve(`experiments/${agent}.json`)
+    : resolve('experiments/stub.json');
 
   // 1. Run baseline (without candidate skill or using baseline skill)
   const baselineOptions: Options = {
     suite: matrix.suite,
-    agent: 'stub',
+    agent,
     casesDir,
     runsDir,
-    experimentFile: resolve('experiments/stub.json'),
+    experimentFile,
     watch: false,
     failFast: false,
-    skill: matrix.baseline?.path,
+    skill: baseline?.path,
   };
   const baselineRun = await run(baselineOptions);
   const baselineRunDir = join(runsDir, baselineRun.runId);
@@ -82,13 +90,13 @@ export async function runSkillMatrix(matrix: SkillMatrixConfig, baseRunsDir: str
   // 2. Run candidate with SUT skill
   const candidateOptions: Options = {
     suite: matrix.suite,
-    agent: 'stub',
+    agent,
     casesDir,
     runsDir,
-    experimentFile: resolve('experiments/stub.json'),
+    experimentFile,
     watch: false,
     failFast: false,
-    skill: matrix.sut.path,
+    skill: sut.path,
   };
   const candidateRun = await run(candidateOptions);
   const candidateRunDir = join(runsDir, candidateRun.runId);
@@ -135,7 +143,7 @@ export async function runSkillMatrix(matrix: SkillMatrixConfig, baseRunsDir: str
   const winRate = allCaseIds.length > 0 ? (improved + comparisons.filter(c => c.candidate_status === 'pass').length) / (allCaseIds.length * 2) : 0;
 
   return {
-    skill: matrix.sut.name,
+    skill: sut.name,
     suite: matrix.suite,
     total_cases: allCaseIds.length,
     improved,

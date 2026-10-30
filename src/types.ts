@@ -123,9 +123,13 @@ export interface LoadedSkill {
   version?: string;
 }
 export interface SkillMatrixConfig {
-  sut: { name: string; path: string; version?: string };
+  sut?: { name: string; path: string; version?: string };
   baseline?: { name: string; path?: string } | null;
+  skill?: string;
+  candidate_skill_dir?: string;
+  baseline_skill_dir?: string;
   suite: string;
+  agent?: string;
   models?: string[];
   cases_dir?: string;
   runs_dir?: string;
