@@ -1,0 +1,4 @@
+#!/bin/sh
+set -u
+echo cleanup >> "$VERIFY_EVIDENCE/phases.log"
+exit 0

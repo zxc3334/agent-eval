@@ -1,0 +1,51 @@
+#!/usr/bin/env node
+const { existsSync, readFileSync, writeFileSync } = require('node:fs');
+const { join } = require('node:path');
+
+const workspace = process.env.VERIFY_WORKSPACE;
+const evidence = process.env.VERIFY_EVIDENCE;
+const mapPath = process.env.VERIFY_FEATURES_MAP;
+if (!workspace || !evidence || !mapPath) {
+  console.error('verify phase is missing VERIFY_WORKSPACE, VERIFY_EVIDENCE, or VERIFY_FEATURES_MAP');
+  process.exit(2);
+}
+if (existsSync(join(workspace, '.verify-crash'))) {
+  console.error('verifier blew up');
+  process.exit(2);
+}
+if (existsSync(join(workspace, '.verify-invalid'))) {
+  writeFileSync(join(evidence, 'skill-result.json'), '{');
+  process.exit(0);
+}
+
+const map = JSON.parse(readFileSync(mapPath, 'utf8'));
+const files = {
+  'hello-file': 'hello.txt',
+  'readme-untouched': 'README',
+};
+const expected = {
+  'hello-file': 'replayed\n',
+  'readme-untouched': 'base\n',
+};
+const observation = {};
+const features = [];
+for (const feature of map.features) {
+  const filename = files[feature.id];
+  if (!filename || !Object.hasOwn(expected, feature.id)) {
+    console.error(`no check for ${feature.id}`);
+    process.exit(2);
+  }
+  const file = join(workspace, filename);
+  const actual = existsSync(file) ? readFileSync(file, 'utf8') : null;
+  observation[feature.id] = actual;
+  const refs = [{ artifact: 'verify-observation.json', field: feature.id }];
+  if (actual !== null) refs.push({ artifact: filename, field: 'contents' });
+  features.push({
+    id: feature.id,
+    passed: actual === expected[feature.id],
+    actual,
+    evidence: refs,
+  });
+}
+writeFileSync(join(evidence, 'verify-observation.json'), `${JSON.stringify(observation, null, 2)}\n`);
+writeFileSync(join(evidence, 'skill-result.json'), `${JSON.stringify({ features }, null, 2)}\n`);

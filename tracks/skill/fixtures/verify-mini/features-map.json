@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "features": [
+    {
+      "id": "hello-file",
+      "mode": "hard",
+      "reason": "Fixture verify skill: hello.txt must contain the replayed greeting."
+    },
+    {
+      "id": "readme-untouched",
+      "mode": "diagnostic",
+      "reason": "Fixture verify skill: README drift is recorded and does not change the score."
+    }
+  ]
+}

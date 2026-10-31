@@ -1,0 +1,8 @@
+#!/bin/sh
+set -u
+if [ -f "$VERIFY_WORKSPACE/.verify-unavailable" ]; then
+  echo 'verifier cannot score this workspace' >&2
+  exit 75
+fi
+echo doctor >> "$VERIFY_EVIDENCE/phases.log"
+exit 0
