@@ -1,0 +1,14 @@
+schema_version: 1
+id: base-none
+status: draft
+public:
+  requirement: "做一件具体的事。"
+  repo:
+    id: zxc3334/agent-eval
+    host: github
+  base_commit:
+    status: none
+    reason: "没有起点提交。"
+private:
+  not_replay_ready:
+    reason: "base 被标成了没有。"

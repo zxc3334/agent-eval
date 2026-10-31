@@ -1,0 +1,29 @@
+# Format sample for a chat-only draft. source.md is the captured wording, not an imported history.
+schema_version: 1
+id: chat-only-draft
+status: draft
+public:
+  requirement: "把问候改短。先不要开 PR。"
+  repo:
+    id: zhang-chuan-dev/jackson-bot
+    host: origin
+  base_commit:
+    status: todo
+    reason: "Not pinned to a commit yet."
+private:
+  provenance:
+    kind: chat
+    ref: tasks/chat-only-draft/source.md
+    note: Format sample for the chat-only draft path. No historical transcript is imported here.
+  pr:
+    status: "N/A"
+    reason: "Chat-only capture; no pull request was opened."
+  merge:
+    status: "N/A"
+    reason: "Chat-only capture; nothing was merged."
+  interventions:
+    status: unknown
+  verify:
+    status: none
+  not_replay_ready:
+    reason: "Chat-only capture has no pinned base commit yet, so this card is not replay-ready."

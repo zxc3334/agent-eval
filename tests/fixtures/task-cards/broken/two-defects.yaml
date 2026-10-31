@@ -1,0 +1,13 @@
+schema_version: 1
+id: two-defects
+status: replay-ready
+public:
+  requirement: "做一件具体的事。"
+  repo:
+    id: zxc3334/agent-eval
+    host: github
+  base_commit: "abc"
+private:
+  interventions:
+    status: unknown
+    count: 0

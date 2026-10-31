@@ -1,12 +1,12 @@
 # agent-eval · M0 本地冒烟
 
-Skill 线薄 CLI（R1 骨架）：`pnpm eval --help`。三线目录与依赖规则见 [docs/repo-layout.md](docs/repo-layout.md)。本页其余 `eval:m0` 命令是已有的 M0 本地冒烟，不是 skill track。
+Skill 线薄 CLI（R1 骨架）：`pnpm eval --help`。三线目录与依赖规则见 [docs/repo-layout.md](docs/repo-layout.md)。任务卡格式见 [docs/task-card.md](docs/task-card.md)。本页其余 `eval:m0` 命令是已有的 M0 本地冒烟，不是 skill track。
 
 独立 TypeScript 评测仓库。当前只测本地确定性 **stub**，不代表 jackson-bot 的能力；真实产品以后仅经 adapter 接入。本波范围是 E0/E1/E2，不接模型，不需要 API key、Docker 或 bot。
 
 ## 安装与第一轮
 
-需要 **Node.js 24+、pnpm、macOS 或 Linux**。使用 Node 原生 TypeScript 执行，运行时无第三方依赖；开发依赖仅 TypeScript 和 Node 类型。锁文件固定版本。
+需要 **Node.js 24+、pnpm、macOS 或 Linux**。使用 Node 原生 TypeScript 执行。M0 冒烟没有运行时依赖；任务卡解析依赖 `yaml`。开发依赖是 TypeScript 和 Node 类型。锁文件固定版本。
 
 ```sh
 pnpm install
