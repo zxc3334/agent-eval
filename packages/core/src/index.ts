@@ -1,6 +1,28 @@
 export { formatHelp, runCli } from './cli.ts';
 export type { Command, CommandResult, Track } from './cli.ts';
 export { taskCommand } from './task-cli.ts';
+export {
+  MARK_UNITS,
+  baselineLabelFromRaw,
+  countRounds,
+  dedupeKey,
+  formatBaseline,
+  normalizeMarkSource,
+  parseMarkExport,
+  parseMarkKind,
+  planMarks,
+  resolveProvenance,
+  sharedBaseline,
+} from './marks.ts';
+export type {
+  BaselineCount,
+  ConfirmChoice,
+  DirectMark,
+  MarkPlan,
+  MarkPlanResult,
+  ResolvedProvenance,
+  SharedBaseline,
+} from './marks.ts';
 export { identifier, repoPaths, writeJson } from './config.ts';
 export type { RepoPaths } from './config.ts';
 export { reservedEvidenceHooks } from './evidence.ts';
@@ -44,6 +66,10 @@ export type {
   DiffStats,
   InterventionRecord,
   Interventions,
+  MarkBoundary,
+  MarkCandidate,
+  MarkKind,
+  MarkOrigin,
   MergeValue,
   OptionalGap,
   PullRequestValue,

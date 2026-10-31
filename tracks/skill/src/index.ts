@@ -1,7 +1,8 @@
 import type { Track } from '../../../packages/core/src/cli.ts';
 import { taskCommand } from '../../../packages/core/src/task-cli.ts';
+import { replayCommand } from './replay-cli.ts';
 
-/** Skill track mount. `noop` proves the shell; `task` records and imports cards. */
+/** Skill track mount. `noop` proves the shell; `task` records cards; `replay` runs them. */
 export const skillTrack: Track = {
   name: 'skill',
   summary: 'Skill and config workflow eval. The only track implemented this wave.',
@@ -19,5 +20,6 @@ export const skillTrack: Track = {
       },
     },
     taskCommand,
+    replayCommand,
   ],
 };
