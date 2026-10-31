@@ -1,0 +1,31 @@
+{
+  "recorded_from": "Measured fields are from the 2026-10-28 QA note for Origin PR #8 (head 557e9701, base main @ 32c3a9a5, +502/-80, 15 files). The requirement candidate is the linked issue text, not a reconstructed pull-request body. Merge SHA was not in that note. Origin CLI auth was not available when this export was written.",
+  "host": "origin",
+  "repo": "zhang-chuan-dev/jackson-bot",
+  "default_branch": "main",
+  "verify": "none",
+  "number": 8,
+  "title": "HITL A1 / Issue #1 · approval_id 绑定确认/取消",
+  "url": "https://cursor.com/codebase/zhang-chuan-dev/jackson-bot/pull/8",
+  "base_ref": "main",
+  "base_sha": "32c3a9a588e3ac831d57d423c3b707558380d70a",
+  "head_ref": "cursor/approval-id-confirm-8f25",
+  "head_sha": "557e9701706e03f205e5c31375dbddf2b3193130",
+  "additions": 502,
+  "deletions": 80,
+  "changed_files": 15,
+  "requirement_candidates": [
+    {
+      "kind": "linked_issue",
+      "ref": "https://app.notion.com/p/406e1347ee9781fb8191d89b52a42169",
+      "text": "core/gate.ts:13 的 matchPhrase 只匹配裸关键词，decide 不校验审批 ID；app.ts:102 的 createSerialQueue 串行处理消息，但 runConfirmed 完成后可再次挂起新动作。隔离探针已复现：针对动作 A 连续排队两条不同 msg_id 的“确认”，第二条会批准随后生成的 B。另有配置歧义：确认、取消词归一化后重叠时优先返回 ok，config/load.ts:108 未验证冲突。\n\n确认与取消指令携带唯一审批编号；校验当前主人身份、pending.openid、审批 ID 和可确认状态，裸关键词只能提示选择具体审批。\n审批 A 完成、取消或被替换后，针对 A 的旧指令不得批准 B；连续排队两次确认 A 最多执行 A 一次。\n多个候选动作必须逐项展示独立编号，不以“确认”默认批准全部或下一项。\n加载配置时对关键词执行相同归一化，拒绝空词及确认／取消交集，并给出可定位错误。\ntests/gate.test.ts 与 tests/pipeline.test.ts 补充生产串行队列回归：重复 msg_id、不同 msg_id 的重复确认、过期编号、另一主人和陌生人的确认／取消均不越权执行。"
+    }
+  ],
+  "comments": [
+    {
+      "kind": "review",
+      "body": "vendor data/ globSync 既有红，不挡 A1 合入（与 PR body 自述及既往验收一致）。",
+      "url": "https://app.notion.com/p/407e1347ee978162b1c9df78c5fd0429"
+    }
+  ]
+}

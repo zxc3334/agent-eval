@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Thin base: run directories, reserved evidence hooks, CLI shell, config primitives, and task cards.",
+  "description": "Thin base: run directories, reserved evidence hooks, CLI shell, config primitives, task cards, and read-only pull-request import.",
   "exports": {
     ".": "./src/index.ts"
   },

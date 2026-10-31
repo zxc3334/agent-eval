@@ -1,0 +1,12 @@
+{
+  "number": 8,
+  "title": "HITL A1 / Issue #1 · approval_id 绑定确认/取消",
+  "baseRef": "main",
+  "headRef": "cursor/approval-id-confirm-8f25",
+  "additions": 502,
+  "deletions": 80,
+  "changedFiles": 15,
+  "headSha": "557e9701706e03f205e5c31375dbddf2b3193130",
+  "baseSha": "32c3a9a588e3ac831d57d423c3b707558380d70a",
+  "url": "https://cursor.com/codebase/zhang-chuan-dev/jackson-bot/pull/8"
+}

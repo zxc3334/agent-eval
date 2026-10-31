@@ -25,6 +25,18 @@ export {
   TaskCardError,
   validateTaskCard,
 } from './task-card.ts';
+export { readGithubPull } from './task-import-github.ts';
+export { readOriginPull } from './task-import-origin.ts';
+export {
+  ImportError,
+  loadImportFile,
+  snapshotFromUnknown,
+} from './task-import-snapshot.ts';
+export {
+  CANDIDATE_DISCLAIMER,
+  buildImportedCard,
+  writeTaskCardFile,
+} from './task-import.ts';
 export type {
   AgentInput,
   CardIssue,
@@ -43,3 +55,11 @@ export type {
   TaskCard,
   VerifyState,
 } from './task-card.ts';
+export type {
+  ImportComment,
+  LoadHints,
+  PullSnapshot,
+  RequirementCandidate,
+  VerifyClaim,
+} from './task-import-snapshot.ts';
+export type { ImportChoices } from './task-import.ts';
