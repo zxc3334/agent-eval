@@ -2,7 +2,7 @@
 
 一张卡记录一次真实任务：当时的需求原文、从哪个提交开始、后来有没有合入。重放从 `base_commit` 起步。卡里没有 gold，也没有期望输出。
 
-主文件是 `tasks/<id>/card.yaml`。`<id>` 只含字母、数字、`_`、`-`，并且和卡里的 `id` 相同。JSON 只是可选导出，用来互换，不是另一套主格式。本票不提供 `task add` / `validate` 命令，校验走 `packages/core` 的库 API。
+主文件是 `tasks/<id>/card.yaml`。`<id>` 只含字母、数字、`_`、`-`，并且和卡里的 `id` 相同。JSON 只是可选导出，用来互换，不是另一套主格式。录入、列出、查看和校验走下面的 CLI，校验规则仍是 `packages/core` 的库 API。
 
 ## 十分钟写一张卡
 
@@ -143,6 +143,28 @@ AgentInput 只从允许列表投影，不把整张卡展开：
 
 `loadTaskCard` 在卡不合法时抛 `TaskCardError`。
 
+## CLI
+
+`pnpm eval task` 挂在 R1 的入口上。它只录入和检查卡片，不导入 Origin，也不标记插手。
+
+```sh
+pnpm eval task --help
+pnpm eval task add
+pnpm eval task list
+pnpm eval task show <id>
+pnpm eval task validate [id]
+```
+
+`add` 按字段提问，几分钟内能写完。需求原文可以多行输入（单独一行 `.` 结束）、从文件读，或从剪贴板读。可以存成 draft。需求原文、仓库、base commit 都是具体值时才接受 `replay-ready`；否则改存 draft，并要求写出原因。成功时打印 `tasks/<id>/card.yaml` 的路径。
+
+`list` 打印制表符分隔的表：`id`、`status`、`base`、`intervention`、`verify`、`missing_required`。`base` 是 7 位短 SHA，或者缺口状态。插手没有历史时是 `unknown`，不是 0。`verify` 列是路径、`none` 或 `missing`。文件里没写 verify 时显示 `missing`，写了 `none` 时显示 `none`。这两种都不是 error。`status` 一列区分 draft 和 replay-ready。`missing_required` 是需求原文、仓库、base commit 里还不是具体值的个数。
+
+`show` 把 `none`、`todo`、`unknown`、`N/A`、`unavailable` 标成 `status`。只有 schema 问题才标 `error`。base 是缺口时，存在性是 `N/A`。离线或没有对应的本地仓库时，存在性是 `unavailable`，不是 error。
+
+`validate` 逐字段打印结果。SHA 格式在本地检查，不访问 git。`--offline`，或没有和卡片 `repo.id` 对应的本地 checkout 时，存在性是 `unavailable`，退出码是 0。删掉 base SHA、SHA 格式不对，或在线检查时 commit 不在给出的仓库里，退出码非 0。缺 verify 不会失败。verify 写成非法状态才会失败。
+
+`--root <dir>` 指定仓库根，卡片写到 `<dir>/tasks`。`--repo-dir <dir>` 指定用来查 commit 的本地 checkout。命令自己的参数写在 `task` 后面；`pnpm eval --help` 仍是壳的帮助。
+
 ## 不做
 
-gold、期望输出、重放、判分、强制创建 verify、数据库、Web UI、`task add` / `list` / `show` / `validate` 命令。
+gold、期望输出、重放、判分、强制创建 verify、数据库、Web UI、Origin 导入、插手标记。

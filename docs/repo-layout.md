@@ -7,7 +7,7 @@
 ```text
 agent-eval/
   packages/core/     薄底座：跑次目录、预留的证据钩子、CLI 壳、配置原语
-  tracks/skill/      当前唯一实施线（本波只有 noop 命令）
+  tracks/skill/      当前唯一实施线（noop，以及 task 录入命令）
   tracks/agent/      占位 README，不实现
   tracks/model/      占位 README，不实现
   tasks/             真实任务卡，格式见 docs/task-card.md
@@ -57,9 +57,10 @@ agent 与 model 本波没有 `package.json`，也没有 TypeScript。占位目�
 pnpm install
 pnpm eval --help
 pnpm eval noop
+pnpm eval task --help
 ```
 
-`pnpm eval` 进入薄壳：没有子命令时打印帮助；`noop` 是 skill track 注册的空命令，退出码 0，输出 `skill noop: ok`。这证明壳能挂载 track。
+`pnpm eval` 进入薄壳：没有子命令时打印帮助；`noop` 是 skill track 注册的空命令，退出码 0，输出 `skill noop: ok`。这证明壳能挂载 track。`task` 录入、列出、查看和校验任务卡，用法见 [task-card.md](task-card.md)。写在命令名后面的参数属于该命令，例如 `pnpm eval task validate --offline`。写在命令名前面的未知参数仍然由壳拒绝。
 
 M0 本地冒烟仍走原来的入口：
 
@@ -72,7 +73,7 @@ pnpm eval:m0 --help
 
 ## runs/
 
-克隆之后 `runs/` 存在。跑次产物匹配 `runs/*`，被 git 忽略；`runs/.gitkeep` 保留在版本库里。本票的 `noop` 和 `--help` 不创建跑次。
+克隆之后 `runs/` 存在。跑次产物匹配 `runs/*`，被 git 忽略；`runs/.gitkeep` 保留在版本库里。本票的 `noop`、`--help` 和 `task` 不创建跑次。
 
 ## 本波不做
 

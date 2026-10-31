@@ -1,6 +1,6 @@
 # agent-eval · M0 本地冒烟
 
-Skill 线薄 CLI（R1 骨架）：`pnpm eval --help`。三线目录与依赖规则见 [docs/repo-layout.md](docs/repo-layout.md)。任务卡格式见 [docs/task-card.md](docs/task-card.md)。本页其余 `eval:m0` 命令是已有的 M0 本地冒烟，不是 skill track。
+Skill 线 CLI：`pnpm eval --help`，任务卡录入是 `pnpm eval task --help`。三线目录与依赖规则见 [docs/repo-layout.md](docs/repo-layout.md)。任务卡格式见 [docs/task-card.md](docs/task-card.md)。本页其余 `eval:m0` 命令是已有的 M0 本地冒烟，不是 skill track。
 
 独立 TypeScript 评测仓库。当前只测本地确定性 **stub**，不代表 jackson-bot 的能力；真实产品以后仅经 adapter 接入。本波范围是 E0/E1/E2，不接模型，不需要 API key、Docker 或 bot。
 

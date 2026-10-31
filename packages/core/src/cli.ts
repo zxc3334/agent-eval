@@ -1,10 +1,12 @@
 import { parseArgs } from 'node:util';
 import { identifier } from './config.ts';
 
+export type CommandResult = number | Promise<number>;
+
 export interface Command {
   name: string;
   summary: string;
-  run(args: readonly string[]): number;
+  run(args: readonly string[]): CommandResult;
 }
 
 export interface Track {
@@ -32,6 +34,7 @@ export function formatHelp(tracks: readonly Track[]): string {
     'Usage:',
     '  pnpm eval --help',
     '  pnpm eval <command>',
+    '  pnpm eval task --help',
     '',
     'Mounted tracks:',
     mounted,
@@ -63,29 +66,45 @@ function assertMountable(tracks: readonly Track[]): void {
   }
 }
 
-export function runCli(tracks: readonly Track[], argv: readonly string[] = process.argv.slice(2)): number {
+/** Flags before the command stay on the shell. The command receives everything after its name. */
+function splitInvocation(argv: readonly string[]): { globalArgs: string[]; commandArgs: string[] } {
+  const globalArgs: string[] = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (token === '--') return { globalArgs, commandArgs: argv.slice(index + 1) };
+    if (token.startsWith('-')) {
+      globalArgs.push(token);
+      continue;
+    }
+    return { globalArgs, commandArgs: argv.slice(index) };
+  }
+  return { globalArgs, commandArgs: [] };
+}
+
+export function runCli(tracks: readonly Track[], argv: readonly string[] = process.argv.slice(2)): CommandResult {
   try {
     assertMountable(tracks);
-    const { values, positionals } = parseArgs({
-      args: [...argv],
-      allowPositionals: true,
+    const { globalArgs, commandArgs } = splitInvocation(argv);
+    const { values } = parseArgs({
+      args: globalArgs,
+      allowPositionals: false,
       strict: true,
       options: {
         help: { type: 'boolean', short: 'h', default: false },
       },
     });
-    if (values.help || positionals.length === 0) {
+    if (values.help || commandArgs.length === 0) {
       console.log(formatHelp(tracks));
       return 0;
     }
-    const command = tracks.flatMap(track => [...track.commands]).find(item => item.name === positionals[0]);
+    const command = tracks.flatMap(track => [...track.commands]).find(item => item.name === commandArgs[0]);
     if (!command) {
-      console.error(`unknown command: ${positionals[0]}`);
+      console.error(`unknown command: ${commandArgs[0]}`);
       console.error('M0 smoke: pnpm eval:m0 --help');
       console.log(formatHelp(tracks));
       return 2;
     }
-    return command.run(positionals.slice(1));
+    return command.run(commandArgs.slice(1));
   } catch (error) {
     console.error(`environment_error: ${(error as Error).message}`);
     console.error('M0 smoke: pnpm eval:m0 --help');
