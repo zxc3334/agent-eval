@@ -15,6 +15,10 @@ importers:
         specifier: 5.7.3
         version: 5.7.3
 
+  packages/core: {}
+
+  tracks/skill: {}
+
 packages:
 
   '@types/node@20.17.19':

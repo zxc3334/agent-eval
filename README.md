@@ -1,5 +1,7 @@
 # agent-eval · M0 本地冒烟
 
+Skill 线薄 CLI（R1 骨架）：`pnpm eval --help`。三线目录与依赖规则见 [docs/repo-layout.md](docs/repo-layout.md)。本页其余 `eval:m0` 命令是已有的 M0 本地冒烟，不是 skill track。
+
 独立 TypeScript 评测仓库。当前只测本地确定性 **stub**，不代表 jackson-bot 的能力；真实产品以后仅经 adapter 接入。本波范围是 E0/E1/E2，不接模型，不需要 API key、Docker 或 bot。
 
 ## 安装与第一轮
@@ -8,7 +10,7 @@
 
 ```sh
 pnpm install
-pnpm eval --suite smoke --agent stub
+pnpm eval:m0 --suite smoke --agent stub
 ```
 
 smoke 有两个协议样例：`smoke-pass` 输出 `hello`，`smoke-fail` 输出 `wrong`。两例的硬断言都期望 `hello`，因此默认是 **1 pass + 1 fail，退出码 1**，这是预期结果。stub 只读取 input/fixture，输出 answer；独立 verifier 用深相等硬断言判定结果，stub 不读取验收文件、不直接返回成绩。
@@ -44,7 +46,7 @@ cases/<case-id>/
 
 ```sh
 # 使用 CLI 打印的 run-id；不依赖当前 case 文件即可重建报告
-pnpm eval report <run-id>
+pnpm eval:m0 report <run-id>
 ```
 
 `report` 成功生成返回 0，不复用原 run 的评测退出码。已有证据不变，仅重建 summary/report。
@@ -52,11 +54,11 @@ pnpm eval report <run-id>
 ## 改 case 并单例重跑
 
 ```sh
-pnpm eval --suite smoke --agent stub --case smoke-fail
-pnpm eval --case smoke-fail --watch
+pnpm eval:m0 --suite smoke --agent stub --case smoke-fail
+pnpm eval:m0 --case smoke-fail --watch
 # 使用上轮 run-id；选择所有非 pass，以及中断/fail-fast 后未尝试的 case
-pnpm eval --failed-from <run-id>
-pnpm eval --failed-from <run-id> --watch
+pnpm eval:m0 --failed-from <run-id>
+pnpm eval:m0 --failed-from <run-id> --watch
 ```
 
 例如把 `cases/smoke/smoke-fail/fixture.json` 中 `answer` 改成 `hello`，或修改 `acceptance.json` 中 `expected`，保存后重跑即可看到变化。case 的 `input`、`fixture`、`acceptance` 都是相对于本例目录的 JSON 文件路径。
@@ -70,12 +72,12 @@ watch 每 100ms 检查所选 case 目录及 suite 清单，连续修改静默 15
 ## 故障注入与开发自检
 
 ```sh
-pnpm eval --suite faults --agent stub        # 预期退出 2
-pnpm eval --suite faults --case timeout      # 可验证部分产物、子孙进程清理
-pnpm eval --suite smoke --fail-fast
+pnpm eval:m0 --suite faults --agent stub        # 预期退出 2
+pnpm eval:m0 --suite faults --case timeout      # 可验证部分产物、子孙进程清理
+pnpm eval:m0 --suite smoke --fail-fast
 pnpm test
 pnpm typecheck
-pnpm eval --help
+pnpm eval:m0 --help
 ```
 
 `case.json` 的 `inject` 支持 `agent_error`、`protocol_error`、`timeout`、`verifier_error`、`environment_error`。`fixture.json` 可设置 `delay_ms` 制造慢调用。`timeout_ms` 为本例 agent 预算（1–300000ms）；input、fixture 和 acceptance 在启动前验证。`criteria` 当前只支持 `{ "id": "名称", "type": "equals", "expected": 任意JSON值 }`。
@@ -86,7 +88,7 @@ pnpm eval --help
 
 ## 本波边界
 
-这里只交付 M0 本地协议链路。借鉴 Harbor 的独立 verifier/产物分离与 Workbench 的需求→case→证据，不采用二者 runtime。不实现 E3+、Gold/Oracle 校准、真实 adapter、baseline 对比、公共榜、云并行、线上 QQ 或默认 LLM judge。
+本节只约束 M0 冒烟代码：这里只交付 M0 本地协议链路。Skill 线骨架见 [docs/repo-layout.md](docs/repo-layout.md)。借鉴 Harbor 的独立 verifier/产物分离与 Workbench 的需求→case→证据，不采用二者 runtime。不实现 E3+、Gold/Oracle 校准、真实 adapter、baseline 对比、公共榜、云并行、线上 QQ 或默认 LLM judge。
 
 本机验收是 macOS arm64；Linux 使用相同 POSIX 机制但尚未实机验证，Windows 不支持本波进程组清理。不可捕获的 SIGKILL/断电不保证最后一份报告已写完；已写入的证据保留。stub 进程隔离用于生命周期管理，不是执行不可信代码的安全沙箱。
 

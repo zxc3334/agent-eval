@@ -6,7 +6,8 @@
   "engines": { "node": ">=24.0.0" },
   "packageManager": "pnpm@11.19.0",
   "scripts": {
-    "eval": "node src/cli.ts",
+    "eval": "node src/eval.ts",
+    "eval:m0": "node src/cli.ts",
     "test": "node --test --test-concurrency=1 tests/*.test.ts",
     "typecheck": "tsc --noEmit"
   },

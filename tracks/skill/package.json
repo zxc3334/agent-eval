@@ -1,0 +1,10 @@
+{
+  "name": "@agent-eval/skill",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Skill track. The only track mounted this wave.",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
