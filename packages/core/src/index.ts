@@ -1,5 +1,6 @@
 export { formatHelp, runCli } from './cli.ts';
-export type { Command, Track } from './cli.ts';
+export type { Command, CommandResult, Track } from './cli.ts';
+export { taskCommand } from './task-cli.ts';
 export { identifier, repoPaths, writeJson } from './config.ts';
 export type { RepoPaths } from './config.ts';
 export { reservedEvidenceHooks } from './evidence.ts';

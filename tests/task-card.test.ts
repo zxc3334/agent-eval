@@ -460,8 +460,9 @@ test('task card doc states the allowlist, unknown interventions, and unavailable
   assert.match(doc, /`unavailable`。这不是「commit 不存在」/);
 });
 
-test('task validate is not a CLI command yet', () => {
+test('task validate accepts the sample cards', () => {
   const result = spawnSync(process.execPath, ['src/eval.ts', 'task', 'validate'], { cwd: root, encoding: 'utf8' });
-  assert.equal(result.status, 2);
-  assert.match(result.stderr, /unknown command: task/);
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.match(result.stdout, /result: ok/);
+  assert.equal(result.stdout.includes(': error'), false);
 });

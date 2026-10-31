@@ -1,6 +1,7 @@
 import type { Track } from '../../../packages/core/src/cli.ts';
+import { taskCommand } from '../../../packages/core/src/task-cli.ts';
 
-/** Skill track mount. This wave exposes a no-op so the CLI shell can register a command. */
+/** Skill track mount. `noop` proves the shell; `task` records cards. */
 export const skillTrack: Track = {
   name: 'skill',
   summary: 'Skill and config workflow eval. The only track implemented this wave.',
@@ -17,5 +18,6 @@ export const skillTrack: Track = {
         return 0;
       },
     },
+    taskCommand,
   ],
 };
