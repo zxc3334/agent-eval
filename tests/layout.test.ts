@@ -36,6 +36,7 @@ test('pnpm eval --help lists the mounted skill command and placeholder tracks', 
   assert.match(help.stdout, /pnpm eval <command>/);
   assert.match(help.stdout, /skill —/);
   assert.match(help.stdout, /noop —/);
+  assert.match(help.stdout, /compare —/);
   assert.match(help.stdout, /agent —/);
   assert.match(help.stdout, /model —/);
   assert.match(help.stdout, /not mounted/);
@@ -55,9 +56,14 @@ test('no args prints help; noop is mounted; unknown commands exit 2', () => {
   const help = evalCli(['--help']);
   assert.match(help.stdout, /replay —/);
 
-  const unknown = evalCli(['compare']);
+  const compare = evalCli(['compare', '--help']);
+  assert.equal(compare.status, 0, compare.stderr);
+  assert.match(compare.stdout, /--tasks <filter>/);
+  assert.match(compare.stdout, /--a without --b with-skill/);
+
+  const unknown = evalCli(['leaderboard']);
   assert.equal(unknown.status, 2);
-  assert.match(unknown.stderr, /unknown command: compare/);
+  assert.match(unknown.stderr, /unknown command: leaderboard/);
 
   const extra = evalCli(['noop', 'extra']);
   assert.equal(extra.status, 2);

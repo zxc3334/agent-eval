@@ -80,8 +80,8 @@ runs/<run-id>/variants/<name>/attempts/<n>/metrics.json   仅 --repeat > 1
 | `interventions` | 本轮 `actual_human_intervention`。不含 request | 卡上确认过的插手次数，或 `none` / `unknown` | 两边都能当数字时，`replay - baseline`。`none` 只在这次减法里按 0。任一端是 `unknown` 时 delta 是 `unknown`，不是 `replay - 0` |
 | `rework_rounds` | 本轮返工轮 | 卡上确认过的返工轮，同一套 `none` / `unknown` | 同上 |
 
-正的 delta 表示这次重放比卡上的历史基线多。这是和**历史**比，不是 with-skill 减 without。with / without 的逐卡差值是 R9，读这里的 `metrics.json`，本票不画对比。
+正的 delta 表示这次重放比卡上的历史基线多。这是和**历史**比，不是 with-skill 减 without。with / without 的逐卡差值由 `pnpm eval compare` 读取这里的 `metrics.json`，见 [compare.md](compare.md)。
 
 ## 不做
 
-不汇总多张卡，不画 with / without 看板。不评 skill 触发率或误触率。不因缺 verify 拒绝写 `metrics.json`。
+不评 skill 触发率或误触率。不因缺 verify 拒绝写 `metrics.json`。多张卡的 with / without 对比不在本文件里画，见 [compare.md](compare.md)。

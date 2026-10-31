@@ -1,10 +1,11 @@
 import type { Track } from '../../../packages/core/src/cli.ts';
 import { taskCommand } from '../../../packages/core/src/task-cli.ts';
+import { compareCommand } from './compare-cli.ts';
 import { metricsCommand } from './metrics-cli.ts';
 import { replayCommand } from './replay-cli.ts';
 import { verifyCommand } from './verify-cli.ts';
 
-/** Skill track mount. `noop` proves the shell; `task` records cards; `replay` runs them; `verify` scores them. */
+/** Skill track mount. `noop` proves the shell; `task` records cards; `replay` runs them; `verify` scores them; `compare` reads the metrics. */
 export const skillTrack: Track = {
   name: 'skill',
   summary: 'Skill and config workflow eval. The only track implemented this wave.',
@@ -25,5 +26,6 @@ export const skillTrack: Track = {
     replayCommand,
     verifyCommand,
     metricsCommand,
+    compareCommand,
   ],
 };
