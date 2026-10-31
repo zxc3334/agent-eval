@@ -9,9 +9,10 @@ pnpm eval task show <id>
 pnpm eval task validate [id]
 pnpm eval task import --pr <owner/repo#N>
 pnpm eval task import --from-file <export.json>
+pnpm eval task mark <id>
 ```
 
-`import` 从 Cursor Origin 只读读取已合 PR，或从 `--from-file` 导出读入。确认前不写卡。没有 verify 也能建卡。详见 [docs/task-card.md](../docs/task-card.md)。
+`import` 从 Cursor Origin 只读读取已合 PR，或从 `--from-file` 导出读入。确认前不写卡。没有 verify 也能建卡。详见 [docs/task-card.md](../docs/task-card.md)。`mark` 确认插手和返工，口径见 [docs/marks.md](../docs/marks.md)。
 
 | 目录 | 状态 | 说明 |
 | --- | --- | --- |

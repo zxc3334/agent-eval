@@ -1,0 +1,19 @@
+{
+  "pull_request": "https://github.com/zhang-chuan-dev/jackson-bot/pull/8",
+  "reviews": [
+    {
+      "id": "rev-greeting",
+      "user": "zhang",
+      "state": "CHANGES_REQUESTED",
+      "body": "问候还是太长，按需求收成「你好」。"
+    }
+  ],
+  "comments": [
+    {
+      "id": "cmt-button",
+      "user": "zhang",
+      "path": "src/greeting.ts",
+      "body": "按钮文案漏改了，和标题一起收短。"
+    }
+  ]
+}

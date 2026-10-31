@@ -433,6 +433,9 @@ test('review text stays an unconfirmed candidate', () => {
   if (!parsed.ok) return;
   assert.equal('records' in parsed.card.private.interventions, false);
   if ('status' in parsed.card.private.interventions) assert.equal(parsed.card.private.interventions.status, 'todo');
+  const candidates = parsed.card.private.candidates ?? [];
+  assert.ok(candidates.some(candidate => candidate.origin === 'fixup' && candidate.excerpt.includes('Bind the approval id')));
+  assert.equal(candidates.some(candidate => 'confirmation' in candidate), false);
   assert.equal(yaml.includes('records:'), false);
   assert.equal(yaml.includes('\n  count:'), false);
   assert.equal(parsed.card.private.verify.status, 'none');

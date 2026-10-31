@@ -104,6 +104,8 @@ chat-only 可以没有 PR 和 merge。两项都写 `status: "N/A"`，并写原�
 
 `status: none` 表示有人确认过：这次没有插手。确认过的插手写成 `records`，每条有 `id` 和 `summary`。不要用记录条数代替状态。
 
+返工轮和未确认候选的口径、去重键、provenance 见 [marks.md](marks.md)。没有返工历史时基线同样是 `unknown`，不是 0。`private.candidates` 里的 fixup/review 在勾选确认之前不计入基线。
+
 ## 公开、私有、AgentInput
 
 `public` 给重放时的任务本身。`private` 给评测者：合入结果、插手、verify、来源、还不能重放的原因。provenance 放在 private，因为链接可能指向已经合入的 PR。
@@ -145,7 +147,7 @@ AgentInput 只从允许列表投影，不把整张卡展开：
 
 ## CLI
 
-`pnpm eval task` 挂在 R1 的入口上。它录入、检查，也从已合 PR 导入。它不标记插手。
+`pnpm eval task` 挂在 R1 的入口上。它录入、检查，也从已合 PR 导入，并用 `mark` 确认插手和返工。
 
 ```sh
 pnpm eval task --help
@@ -156,13 +158,14 @@ pnpm eval task validate [id]
 pnpm eval task import --pr <owner/repo#N>
 pnpm eval task import --origin <owner/repo#N>
 pnpm eval task import --from-file <export.json>
+pnpm eval task mark <id>
 ```
 
 ## 从已合 PR 导入
 
 `import` 读一张已合 PR，先给出候选，确认之后才写 `tasks/<id>/card.yaml`。第一条路径是 Cursor Origin，只跑 `origin repo view` 和 `origin pr view`。GitHub 只是可选对照，读不到也不阻塞。Origin 没登录、离线，或命令不存在时，用 `--from-file` 读已经导出的 JSON 或 markdown。错误会写明原因，并且不会留下半截 `card.yaml`。
 
-PR 描述和 PR base SHA 只是候选。它们不是用户原话，也不是任务真正的起始 commit。提示里选 `accept` 才会抄进卡；否则这两项保持 `todo`，原因里写明候选没有被当成起点。评审和 fixup 只作为未确认候选记在 `sources`，`interventions` 保持 `todo` 或 `unknown`，不会写成记录，也不会写成 0。base 分支不是仓库默认分支，或 PR 在 stack 里时，命令只提示，不拆、不并。缺 verify 写成 `none` 或 `todo`，仍然建卡。
+PR 描述和 PR base SHA 只是候选。它们不是用户原话，也不是任务真正的起始 commit。提示里选 `accept` 才会抄进卡；否则这两项保持 `todo`，原因里写明候选没有被当成起点。评审和 fixup 只作为未确认候选记在 `private.candidates` 和 `sources`。`interventions` 保持 `todo` 或 `unknown`，不会写成记录，也不会写成 0。`task mark` 确认之后才进入基线。base 分支不是仓库默认分支，或 PR 在 stack 里时，命令只提示，不拆、不并。缺 verify 写成 `none` 或 `todo`，仍然建卡。
 
 批量时每条单独确认。`reject` 和 `skip` 不写这一条。前面确认过的可以留下。某一条读取或写入失败，不会把那一条写成半个文件。
 
@@ -189,6 +192,8 @@ PR 描述和 PR base SHA 只是候选。它们不是用户原话，也不是任�
 
 markdown 用 front matter 写同样的字段。`## requirement candidate`、`## review`、`## fixup` 是候选，不会被静默当成起点。
 
+`mark` 读取本地聊天导出或 PR 评审文件，也可以确认卡上已有的候选。类型由人选择：`插手` 或 `返工`。没选的行保持未确认，基线不变。没有历史时基线是 `unknown`，不是 0。同一文件再读一次不会多出条目。不需要 verify。chat-only 可以不写 PR。用法见 [marks.md](marks.md)。
+
 `add` 按字段提问，几分钟内能写完。需求原文可以多行输入（单独一行 `.` 结束）、从文件读，或从剪贴板读。可以存成 draft。需求原文、仓库、base commit 都是具体值时才接受 `replay-ready`；否则改存 draft，并要求写出原因。成功时打印 `tasks/<id>/card.yaml` 的路径。
 
 `list` 打印制表符分隔的表：`id`、`status`、`base`、`intervention`、`verify`、`missing_required`。`base` 是 7 位短 SHA，或者缺口状态。插手没有历史时是 `unknown`，不是 0。`verify` 列是路径、`none` 或 `missing`。文件里没写 verify 时显示 `missing`，写了 `none` 时显示 `none`。这两种都不是 error。`status` 一列区分 draft 和 replay-ready。`missing_required` 是需求原文、仓库、base commit 里还不是具体值的个数。
@@ -201,4 +206,4 @@ markdown 用 front matter 写同样的字段。`## requirement candidate`、`## 
 
 ## 不做
 
-gold、期望输出、重放、判分、强制创建 verify、数据库、Web UI、对 Origin 或 GitHub 写操作、自动判定插手、插手标记。
+gold、期望输出、重放、判分、强制创建 verify、数据库、Web UI、对 Origin 或 GitHub 写操作、自动判定插手。插手和返工的确认见 [marks.md](marks.md)。导入只读。

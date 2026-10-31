@@ -6,13 +6,15 @@ import { stringify } from 'yaml';
 import type { Command } from './cli.ts';
 import { assessCommit } from './sha.ts';
 import { SHA_FORMAT_MESSAGE, canonicalSha } from './sha.ts';
+import { MarkPlanError } from './marks.ts';
 import { parseTaskCardYaml } from './task-card.ts';
 import type { TaskCard } from './task-card.ts';
 import { ImportError, runImport } from './task-import.ts';
+import { executeMark } from './task-mark.ts';
 import { describeCard, formatList, listCellsFromText } from './task-view.ts';
 
 const TASK_HELP = [
-  'task — add, list, show, and validate task cards',
+  'task — add, list, show, validate, import, and mark task cards',
   '',
   'Usage:',
   '  pnpm eval task add [--root <dir>]',
@@ -22,6 +24,9 @@ const TASK_HELP = [
   '  pnpm eval task import --pr <owner/repo#N> [--pr <owner/repo#N> ...]',
   '  pnpm eval task import --origin <owner/repo#N>',
   '  pnpm eval task import --from-file <export.json|export.md> [--from-file ...]',
+  '  pnpm eval task mark <id> [--root <dir>] [--from-file <path>] [--select]',
+  '  pnpm eval task mark <id> --confirm <turn>:<type>[,<turn>:<type>...]',
+  '  pnpm eval task mark <id> --note "…" --type 返工 --source <url>',
   '',
   'import reads a merged pull request and proposes a task card. The first source',
   'is Cursor Origin, read-only (`origin pr view` / `origin repo view`). GitHub is',
@@ -56,6 +61,15 @@ const TASK_HELP = [
   'matches the card repo. unavailable is not a failure.',
   'A missing verify is not a failure. An illegal verify status is.',
   'Deleting the base SHA, or a base SHA that is not in the checkout, exits non-zero.',
+  '',
+  'mark reads a chat export or a pull-request review file, or rows already',
+  'stored as candidates. You choose 插手 or 返工. Unchosen rows stay',
+  'unconfirmed and do not change the baseline. Missing history stays unknown,',
+  'never a confirmed zero. Reading the same file again does not add a second copy.',
+  'mark does not need verify. A chat-only card can omit pull-request fields.',
+  '--type accepts 插手, 返工, intervention, or rework.',
+  '--confirm selects without a prompt. --select reads one choice per row.',
+  'A direct --note is one confirmed event. The same note, type, and source again is a no-op.',
 ].join('\n');
 
 const REQUIRED_GAPS = ['todo', 'unknown', 'unavailable'] as const;
@@ -561,7 +575,18 @@ interface Flags {
   host?: string;
   repo?: string;
   id?: string;
+  select: boolean;
+  confirm: string[];
+  note?: string;
+  type?: string;
+  source?: string;
+  round?: string;
   positionals: string[];
+}
+
+function asList(value: string | string[] | boolean | undefined): string[] {
+  if (!value || typeof value === 'boolean') return [];
+  return Array.isArray(value) ? value : [value];
 }
 
 function readFlags(args: readonly string[]): Flags {
@@ -581,6 +606,12 @@ function readFlags(args: readonly string[]): Flags {
         host: { type: 'string' },
         repo: { type: 'string' },
         id: { type: 'string' },
+        select: { type: 'boolean', default: false },
+        confirm: { type: 'string', multiple: true },
+        note: { type: 'string' },
+        type: { type: 'string' },
+        source: { type: 'string' },
+        round: { type: 'string' },
       },
     });
     return {
@@ -594,6 +625,12 @@ function readFlags(args: readonly string[]): Flags {
       host: values.host,
       repo: values.repo,
       id: values.id,
+      select: values.select,
+      confirm: asList(values.confirm),
+      note: values.note,
+      type: values.type,
+      source: values.source,
+      round: values.round,
       positionals,
     };
   } catch (error) {
@@ -626,9 +663,14 @@ async function dispatch(args: readonly string[]): Promise<number> {
   }
   const root = resolveRoot(flags.root);
   const lookup = { offline: flags.offline, repoDir: flags.repoDir };
-  const importFlags = flags.prs.length + flags.origins.length + flags.files.length
+  const importOnly = flags.prs.length + flags.origins.length
     + (flags.host ? 1 : 0) + (flags.repo ? 1 : 0) + (flags.id ? 1 : 0);
-  if (sub !== 'import' && importFlags > 0) throw new TaskCliError(`task ${sub ?? 'task'}: import flags are only valid for task import`);
+  const markOnly = flags.select || flags.confirm.length > 0 || Boolean(flags.note) || Boolean(flags.type) || Boolean(flags.source) || Boolean(flags.round);
+  if (sub !== 'import' && importOnly > 0) throw new TaskCliError(`task ${sub}: import flags are only valid for task import`);
+  if (sub !== 'mark' && markOnly) throw new TaskCliError(`task ${sub}: unknown option`);
+  if (sub !== 'import' && sub !== 'mark' && flags.files.length > 0) {
+    throw new TaskCliError(`task ${sub}: --from-file is only valid for task import or task mark`);
+  }
   if (sub === 'import') {
     if (rest.length > 0) throw new TaskCliError('usage: pnpm eval task import --pr <owner/repo#N>');
     const io = new LineReader();
@@ -676,12 +718,40 @@ async function dispatch(args: readonly string[]): Promise<number> {
     const id = rest[0] ? checkId(rest[0], 'usage: pnpm eval task validate [id]') : undefined;
     return runValidate(root, id, lookup);
   }
+  if (sub === 'mark') {
+    if (rest.length !== 1) throw new TaskCliError('usage: pnpm eval task mark <id>');
+    if (flags.files.length > 1) throw new TaskCliError('task mark: one --from-file');
+    const id = checkId(rest[0], 'usage: pnpm eval task mark <id>');
+    return runMark(root, id, flags);
+  }
   throw new TaskCliError(`unknown task command: ${sub}`);
+}
+
+function runMark(root: string, id: string, flags: Flags): number {
+  const io = new LineReader();
+  try {
+    const result = executeMark(root, id, {
+      fromFile: flags.files[0],
+      select: flags.select,
+      confirm: flags.confirm,
+      note: flags.note,
+      type: flags.type,
+      source: flags.source,
+      round: flags.round,
+      readLine: () => io.raw(),
+      writeErr,
+    });
+    process.stdout.write(`${result.lines.join('\n')}\n`);
+    return 0;
+  } catch (error) {
+    if (error instanceof MarkPlanError) throw new TaskCliError(error.message);
+    throw error;
+  }
 }
 
 export const taskCommand: Command = {
   name: 'task',
-  summary: 'Add, list, show, validate, and import task cards.',
+  summary: 'Add, list, show, validate, import, and mark task cards.',
   run(args) {
     return runTask(args);
   },

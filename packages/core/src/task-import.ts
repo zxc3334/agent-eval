@@ -6,7 +6,7 @@ import { readOriginPull } from './task-import-origin.ts';
 import { ImportError, loadImportFile } from './task-import-snapshot.ts';
 import type { PullSnapshot } from './task-import-snapshot.ts';
 import { parseTaskCardYaml } from './task-card.ts';
-import type { RepoHost } from './task-card.ts';
+import type { MarkCandidate, MarkOrigin, RepoHost } from './task-card.ts';
 
 export { ImportError } from './task-import-snapshot.ts';
 
@@ -60,6 +60,27 @@ export function baseWarning(snapshot: PullSnapshot): string | undefined {
   }
   if (snapshot.stacked) return 'This pull request is part of a stack. Stacked pull requests were not split.';
   return undefined;
+}
+
+function markCandidates(snapshot: PullSnapshot, prRef: string): MarkCandidate[] {
+  const candidates: MarkCandidate[] = [];
+  snapshot.comments.forEach((comment, index) => {
+    const excerpt = comment.body.trim();
+    if (!excerpt) return;
+    const origin: MarkOrigin = comment.kind === 'fixup' ? 'fixup' : comment.kind === 'review' ? 'review' : 'pr-review';
+    const turn = `${origin}-${index + 1}`;
+    const ref = comment.url ?? prRef;
+    candidates.push({
+      id: turn,
+      summary: clip(excerpt),
+      source: ref,
+      turn,
+      excerpt,
+      origin,
+      provenance: { kind: 'pr', ref },
+    });
+  });
+  return candidates;
 }
 
 function clip(text: string, max = 240): string {
@@ -143,6 +164,7 @@ export function buildImportedCard(snapshot: PullSnapshot, choices: ImportChoices
       note: `unconfirmed ${comment.kind} candidate: ${clip(comment.body)}`,
     });
   }
+  const candidates = markCandidates(snapshot, prRef);
 
   const requirement = acceptedRequirement
     ? acceptedRequirement.text
@@ -186,12 +208,13 @@ export function buildImportedCard(snapshot: PullSnapshot, choices: ImportChoices
     provenance: { kind: 'pr', ref: prRef, note },
     pr: snapshot.url ? { number: snapshot.number, url: snapshot.url } : { number: snapshot.number },
     merge,
-    interventions: snapshot.comments.length
-      ? { status: 'todo', reason: 'Unconfirmed review or fixup candidates are listed in sources. They are not a baseline.' }
+    interventions: candidates.length
+      ? { status: 'todo', reason: 'Unconfirmed review or fixup candidates are listed in private.candidates. They are not a baseline.' }
       : { status: 'unknown' },
     verify,
     sources,
   };
+  if (candidates.length > 0) priv.candidates = candidates;
   if (!concrete) {
     priv.not_replay_ready = {
       reason: `${gaps.join(' and ')} ${gaps.length > 1 ? 'are' : 'is'} still todo. PR base and description were not treated as the task start.`,

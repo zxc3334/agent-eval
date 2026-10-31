@@ -59,7 +59,7 @@ function add(dir: string, lines: readonly string[], env?: NodeJS.ProcessEnv) {
   return { ...result, file };
 }
 
-test('task help lists add, list, show, validate, and import', () => {
+test('task help lists add, list, show, validate, import, and mark', () => {
   for (const args of [['task'], ['task', '--help'], ['task', 'add', '--help']]) {
     const help = evalCli(args);
     assert.equal(help.status, 0, help.stderr);
@@ -69,6 +69,7 @@ test('task help lists add, list, show, validate, and import', () => {
     assert.match(help.stdout, /pnpm eval task validate \[id\]/);
     assert.match(help.stdout, /pnpm eval task import --pr <owner\/repo#N>/);
     assert.match(help.stdout, /--from-file/);
+    assert.match(help.stdout, /pnpm eval task mark <id>/);
     assert.match(help.stdout, /missing verify is not an error/i);
     assert.match(help.stdout, /does not block the card/i);
   }
@@ -79,7 +80,7 @@ test('task help lists add, list, show, validate, and import', () => {
 
   const marked = evalCli(['task', 'mark']);
   assert.equal(marked.status, 2);
-  assert.match(marked.stderr, /unknown task command: mark/);
+  assert.match(marked.stderr, /usage: pnpm eval task mark <id>/);
 });
 
 test('the shell rejects leading unknown flags and forwards task flags', () => {
