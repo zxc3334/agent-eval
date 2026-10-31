@@ -1,6 +1,6 @@
 # 插手和返工
 
-`task mark` 把聊天导出、PR 评审，或卡上已有的候选，标成确认过的事件。计数定义在 `packages/core/src/marks.ts`，R8 直接用同一套函数，不要另写口径。
+`task mark` 把聊天导出、PR 评审，或卡上已有的候选，标成确认过的事件。计数定义在 `packages/core/src/marks.ts`。历史基线仍用这套函数。重放事件流上的插手列和返工轮见 [metrics.md](metrics.md)，不把 request 再加进 actual。
 
 ## 单位
 

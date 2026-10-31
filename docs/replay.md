@@ -68,4 +68,4 @@ Ctrl-C 或 SIGTERM 会停掉 agent 进程组，已经写下的文件留着，`re
 
 ## 不做
 
-replay 本身不算分，不出对比。不自动回答 agent 的提问。不多模型，也不再接第二个 adapter。有 verify 时用 [verify.md](verify.md) 的命令判分。
+replay 本身不算分，不写 `metrics.json`，不出对比。不自动回答 agent 的提问。不多模型，也不再接第二个 adapter。有 verify 时用 [verify.md](verify.md) 的命令判分。指标用 [metrics.md](metrics.md) 的命令采集；没有 verify 也会写出指标，证据完整度是 N/A。

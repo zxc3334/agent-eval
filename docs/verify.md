@@ -60,3 +60,5 @@ runs/<run-id>/
 `--repeat` 的每一次在 `variants/<name>/attempts/<n>/verify/`。replay 自己的 `result.json` 仍是 `unavailable`；判分在旁边的 `verify/result.json`。
 
 仓库里的 `tracks/skill/fixtures/verify-mini` 是微型 fixture verify，用来演示 pass、feature fail、verifier error、unavailable 和 interrupted。它不是目标仓的 verify，也不要求 jackson-bot 创建 verify。
+
+证据完整度不在这次判分里计算。`score=unavailable` 时，指标里的证据完整度是 N/A，见 [metrics.md](metrics.md)。
