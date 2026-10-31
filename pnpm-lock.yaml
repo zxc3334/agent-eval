@@ -15,7 +15,11 @@ importers:
         specifier: 5.7.3
         version: 5.7.3
 
-  packages/core: {}
+  packages/core:
+    dependencies:
+      yaml:
+        specifier: 2.9.1
+        version: 2.9.1
 
   tracks/skill: {}
 
@@ -32,6 +36,11 @@ packages:
   undici-types@6.19.8:
     resolution: {integrity: sha512-ve2KP6f/JnbPBFyobGHuerC9g1FYGn/F8n1LWTwNxCEzd6IfqTwUQcNXgEtmmQ6DlRrC1hrSrBnCZPokRrDHjw==}
 
+  yaml@2.9.1:
+    resolution: {integrity: sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw==}
+    engines: {node: '>= 14.6'}
+    hasBin: true
+
 snapshots:
 
   '@types/node@20.17.19':
@@ -41,3 +50,5 @@ snapshots:
   typescript@5.7.3: {}
 
   undici-types@6.19.8: {}
+
+  yaml@2.9.1: {}

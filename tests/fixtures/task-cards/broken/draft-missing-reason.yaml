@@ -1,0 +1,12 @@
+schema_version: 1
+id: draft-missing-reason
+status: draft
+public:
+  requirement: "做一件具体的事。"
+  repo:
+    id: zxc3334/agent-eval
+    host: github
+  base_commit: "bf2477ff55037527d23582830e7fffbae0a0a738"
+private:
+  verify:
+    status: none

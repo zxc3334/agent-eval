@@ -10,7 +10,7 @@ agent-eval/
   tracks/skill/      当前唯一实施线（本波只有 noop 命令）
   tracks/agent/      占位 README，不实现
   tracks/model/      占位 README，不实现
-  tasks/             真实任务卡目录（本票不定义卡格式）
+  tasks/             真实任务卡，格式见 docs/task-card.md
   runs/              跑次产物，已 gitignore（保留 .gitkeep）
   src/cli.ts         已有 M0 冒烟入口（E0–E2）
   src/eval.ts        本波 CLI 壳的挂载入口
@@ -32,7 +32,7 @@ agent-eval/
 | agent | `tracks/agent` | 不实施、不拆票。产品 agent 闭环的位置 |
 | model | `tracks/model` | 不实施、不拆票。模型能力题的位置 |
 
-共用底座在 `packages/core`。以后结构、采集、格式、CLI 落在 core；重放、可选 verify、指标、对比落在 `tracks/skill`。这些都不在本票。
+共用底座在 `packages/core`。结构、采集、格式、CLI 落在 core；重放、可选 verify、指标、对比落在 `tracks/skill`。任务卡格式在 [task-card.md](task-card.md)。重放、判分、指标、对比都不在本票。
 
 ## 依赖规则
 
@@ -76,6 +76,6 @@ pnpm eval:m0 --help
 
 ## 本波不做
 
-任务卡格式、导入、插手标记、重放、verify、指标、对比、本地 Web、gold。不要求目标仓创建 verify skill。
+导入、插手标记、重放、verify 判分、指标、对比、本地 Web、gold。任务卡格式见 [task-card.md](task-card.md)。不要求目标仓创建 verify skill。
 
 E0–E2 留在 `src/` 与 `cases/`。本票没有把 `feat/e11` 整包合并进来，也没有搬迁冒烟运行器。后续票再按需把可复用模块迁进 core 或 skill。

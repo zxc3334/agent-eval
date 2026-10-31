@@ -3,8 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Thin base: run directories, reserved evidence hooks, CLI shell, config primitives.",
+  "description": "Thin base: run directories, reserved evidence hooks, CLI shell, config primitives, and task cards.",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "yaml": "2.9.1"
   }
 }

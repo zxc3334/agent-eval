@@ -1,0 +1,14 @@
+schema_version: 1
+id: replay-ready-requirement-todo
+status: replay-ready
+public:
+  requirement:
+    status: todo
+    reason: "原文还没贴上。"
+  repo:
+    id: zxc3334/agent-eval
+    host: github
+  base_commit: "bf2477ff55037527d23582830e7fffbae0a0a738"
+private:
+  verify:
+    status: none

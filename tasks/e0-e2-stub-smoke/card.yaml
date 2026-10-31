@@ -1,0 +1,36 @@
+# Real task: merged GitHub PR #1 on zxc3334/agent-eval.
+# base_commit is main before that PR. diff_stats describe the merge; they are not a gold patch.
+schema_version: 1
+id: e0-e2-stub-smoke
+status: replay-ready
+public:
+  requirement: |
+    在 main 上做本地确定性 stub 冒烟：一条命令跑 smoke，预期有通过也有硬断言失败。
+    失败要能定位；中断时清理进程组，故障状态不要写成通过。
+    支持单例重跑，以及按上一轮失败集重跑。
+    不接模型，不需要 API key、Docker 或 bot。
+  repo:
+    id: zxc3334/agent-eval
+    host: github
+  base_commit: "bf2477ff55037527d23582830e7fffbae0a0a738"
+private:
+  provenance:
+    kind: pr
+    ref: https://github.com/zxc3334/agent-eval/pull/1
+    note: Merged PR #1. The requirement text is the task, not the diff.
+  pr:
+    number: 1
+    url: https://github.com/zxc3334/agent-eval/pull/1
+  merge:
+    sha: "ed4b70c0fc8b93d02fd2d8b770b141ae88eb1004"
+    diff_stats:
+      files: 48
+      additions: 873
+      deletions: 1
+  interventions:
+    status: unknown
+  verify:
+    status: none
+  sources:
+    - kind: pr
+      ref: https://github.com/zxc3334/agent-eval/pull/1

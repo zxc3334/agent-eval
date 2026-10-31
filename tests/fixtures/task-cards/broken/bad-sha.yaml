@@ -1,0 +1,14 @@
+schema_version: 1
+id: bad-sha
+status: replay-ready
+public:
+  requirement: "做一件具体的事。"
+  repo:
+    id: zxc3334/agent-eval
+    host: github
+  base_commit: "abc"
+private:
+  verify:
+    status: none
+  interventions:
+    status: unknown
