@@ -52,9 +52,12 @@ test('no args prints help; noop is mounted; unknown commands exit 2', () => {
   assert.equal(noop.status, 0, noop.stderr);
   assert.match(noop.stdout, /skill noop: ok/);
 
-  const unknown = evalCli(['replay']);
+  const help = evalCli(['--help']);
+  assert.match(help.stdout, /replay —/);
+
+  const unknown = evalCli(['compare']);
   assert.equal(unknown.status, 2);
-  assert.match(unknown.stderr, /unknown command: replay/);
+  assert.match(unknown.stderr, /unknown command: compare/);
 
   const extra = evalCli(['noop', 'extra']);
   assert.equal(extra.status, 2);

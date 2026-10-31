@@ -206,4 +206,4 @@ markdown 用 front matter 写同样的字段。`## requirement candidate`、`## 
 
 ## 不做
 
-gold、期望输出、重放、判分、强制创建 verify、数据库、Web UI、对 Origin 或 GitHub 写操作、自动判定插手。插手和返工的确认见 [marks.md](marks.md)。导入只读。
+gold、期望输出、判分、强制创建 verify、数据库、Web UI、对 Origin 或 GitHub 写操作、自动判定插手。插手和返工的确认见 [marks.md](marks.md)。导入只读。重放见 [replay.md](replay.md)。
