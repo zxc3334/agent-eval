@@ -7,6 +7,7 @@ pnpm eval task add
 pnpm eval task list
 pnpm eval task show <id>
 pnpm eval task validate [id]
+pnpm eval task mark <id>
 ```
 
 | 目录 | 状态 | 说明 |

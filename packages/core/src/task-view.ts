@@ -1,4 +1,5 @@
 import { parse as parseYaml } from 'yaml';
+import { baselineLabelFromRaw } from './marks.ts';
 import { canonicalSha } from './sha.ts';
 import { validateTaskCard } from './task-card.ts';
 import type { CardIssue, TaskCard } from './task-card.ts';
@@ -16,6 +17,8 @@ const KNOWN_FIELDS = [
   'private.pr',
   'private.merge',
   'private.interventions',
+  'private.rework',
+  'private.candidates',
   'private.verify',
   'private.sources',
   'private.not_replay_ready',
@@ -275,6 +278,45 @@ function interventionLine(raw: unknown, issues: readonly CardIssue[]): string {
   return `private.interventions: status ${label}`;
 }
 
+function reworkLine(raw: unknown, issues: readonly CardIssue[]): string {
+  if (issues.length > 0) return `private.rework: ${errorText(issues)}`;
+  const priv = privateOf(raw);
+  if (!priv || !('rework' in priv)) return 'private.rework: omitted';
+  const label = baselineLabelFromRaw(priv.rework, 'rounds');
+  if (label === 'invalid') return 'private.rework: invalid';
+  if (isObject(priv.rework) && Array.isArray(priv.rework.records)) return `private.rework: records ${priv.rework.records.length}`;
+  return `private.rework: status ${label}`;
+}
+
+function excerptOf(item: unknown): string {
+  if (!isObject(item)) return '';
+  if (typeof item.excerpt === 'string' && item.excerpt.trim()) return item.excerpt;
+  if (typeof item.summary === 'string') return item.summary;
+  return '';
+}
+
+function recordExcerptLines(field: string, value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item, index) => {
+    const round = isObject(item) && typeof item.round === 'string' ? ` round ${item.round}` : '';
+    return `${field}[${index}]:${round} excerpt ${JSON.stringify(excerptOf(item))}`;
+  });
+}
+
+function candidateLines(value: unknown, verbose: boolean): string[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) return ['private.candidates: invalid'];
+  const lines = [value.length === 0 ? 'private.candidates: empty' : `private.candidates: unconfirmed ${value.length}`];
+  if (!verbose) return lines;
+  for (let index = 0; index < value.length; index += 1) {
+    const item = value[index];
+    const origin = isObject(item) && typeof item.origin === 'string' ? item.origin : 'candidate';
+    const suggested = isObject(item) && typeof item.suggested === 'string' ? ` suggested ${item.suggested}` : '';
+    lines.push(`private.candidates[${index}]: unconfirmed ${origin}${suggested} excerpt ${JSON.stringify(excerptOf(item))}`);
+  }
+  return lines;
+}
+
 function verifyLine(raw: unknown, issues: readonly CardIssue[]): string {
   if (issues.length > 0) return `private.verify: ${errorText(issues)}`;
   const view = verifyView(raw);
@@ -333,6 +375,12 @@ export function describeCard(id: string, text: string, options: { verbose: boole
     prLine(priv && 'pr' in priv ? priv.pr : undefined, errorsUnder(errors, 'private.pr'), verbose),
     mergeLine(priv && 'merge' in priv ? priv.merge : undefined, errorsUnder(errors, 'private.merge'), verbose),
     interventionLine(raw, errorsUnder(errors, 'private.interventions')),
+    reworkLine(raw, errorsUnder(errors, 'private.rework')),
+    `baseline.interventions: ${baselineLabelFromRaw(priv && 'interventions' in priv ? priv.interventions : undefined, 'events')}`,
+    `baseline.rework_rounds: ${baselineLabelFromRaw(priv && 'rework' in priv ? priv.rework : undefined, 'rounds')}`,
+    ...(verbose ? recordExcerptLines('private.interventions.records', isObject(priv?.interventions) ? priv.interventions.records : undefined) : []),
+    ...(verbose ? recordExcerptLines('private.rework.records', isObject(priv?.rework) ? priv.rework.records : undefined) : []),
+    ...candidateLines(priv && 'candidates' in priv ? priv.candidates : undefined, verbose),
     verifyLine(raw, errorsUnder(errors, 'private.verify')),
     sourcesLine(priv && 'sources' in priv ? priv.sources : undefined, errorsUnder(errors, 'private.sources')),
     blockerLine(priv && 'not_replay_ready' in priv ? priv.not_replay_ready : undefined, errorsUnder(errors, 'private.not_replay_ready'), verbose),
