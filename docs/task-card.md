@@ -104,6 +104,8 @@ chat-only 可以没有 PR 和 merge。两项都写 `status: "N/A"`，并写原�
 
 `status: none` 表示有人确认过：这次没有插手。确认过的插手写成 `records`，每条有 `id` 和 `summary`。不要用记录条数代替状态。
 
+返工轮和未确认候选的口径、去重键、provenance 见 [marks.md](marks.md)。没有返工历史时基线同样是 `unknown`，不是 0。`private.candidates` 里的 fixup/review 在勾选确认之前不计入基线。
+
 ## 公开、私有、AgentInput
 
 `public` 给重放时的任务本身。`private` 给评测者：合入结果、插手、verify、来源、还不能重放的原因。provenance 放在 private，因为链接可能指向已经合入的 PR。
@@ -145,7 +147,7 @@ AgentInput 只从允许列表投影，不把整张卡展开：
 
 ## CLI
 
-`pnpm eval task` 挂在 R1 的入口上。它只录入和检查卡片，不导入 Origin，也不标记插手。
+`pnpm eval task` 挂在 R1 的入口上。它录入、检查卡片，并用 `mark` 确认插手和返工。不采集 Origin。
 
 ```sh
 pnpm eval task --help
@@ -153,7 +155,10 @@ pnpm eval task add
 pnpm eval task list
 pnpm eval task show <id>
 pnpm eval task validate [id]
+pnpm eval task mark <id>
 ```
+
+`mark` 读取本地聊天导出或 PR 评审文件，也可以确认卡上已有的候选。类型由人选择：`插手` 或 `返工`。没选的行保持未确认，基线不变。没有历史时基线是 `unknown`，不是 0。同一文件再读一次不会多出条目。不需要 verify。chat-only 可以不写 PR。用法见 [marks.md](marks.md)。
 
 `add` 按字段提问，几分钟内能写完。需求原文可以多行输入（单独一行 `.` 结束）、从文件读，或从剪贴板读。可以存成 draft。需求原文、仓库、base commit 都是具体值时才接受 `replay-ready`；否则改存 draft，并要求写出原因。成功时打印 `tasks/<id>/card.yaml` 的路径。
 
@@ -167,4 +172,4 @@ pnpm eval task validate [id]
 
 ## 不做
 
-gold、期望输出、重放、判分、强制创建 verify、数据库、Web UI、Origin 导入、插手标记。
+gold、期望输出、重放、判分、强制创建 verify、数据库、Web UI、Origin 采集。插手和返工的确认见 [marks.md](marks.md)。

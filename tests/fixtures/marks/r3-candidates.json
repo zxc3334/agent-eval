@@ -1,0 +1,27 @@
+{
+  "candidates": [
+    {
+      "id": "fixup-rename",
+      "origin": "fixup",
+      "source": "https://github.com/zhang-chuan-dev/jackson-bot/pull/8",
+      "turn": "fixup-rename",
+      "excerpt": "手动把 helper 重命名了，重放时按这个名字。",
+      "suggested": "intervention",
+      "provenance": {
+        "kind": "pr",
+        "ref": "https://github.com/zhang-chuan-dev/jackson-bot/pull/8"
+      }
+    },
+    {
+      "id": "review-copy",
+      "origin": "review",
+      "source": "https://github.com/zhang-chuan-dev/jackson-bot/pull/8#discussion_r1",
+      "turn": "review-copy",
+      "excerpt": "这句文案不对，改回原需求里的「你好」。",
+      "provenance": {
+        "kind": "pr",
+        "ref": "https://github.com/zhang-chuan-dev/jackson-bot/pull/8#discussion_r1"
+      }
+    }
+  ]
+}

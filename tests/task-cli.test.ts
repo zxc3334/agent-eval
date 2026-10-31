@@ -67,6 +67,7 @@ test('task help lists add, list, show, and validate', () => {
     assert.match(help.stdout, /pnpm eval task list/);
     assert.match(help.stdout, /pnpm eval task show <id>/);
     assert.match(help.stdout, /pnpm eval task validate \[id\]/);
+    assert.match(help.stdout, /pnpm eval task mark <id>/);
     assert.match(help.stdout, /missing verify is not an error/i);
     assert.equal(help.stdout.includes('import'), false);
   }
@@ -77,7 +78,7 @@ test('task help lists add, list, show, and validate', () => {
 
   const marked = evalCli(['task', 'mark']);
   assert.equal(marked.status, 2);
-  assert.match(marked.stderr, /unknown task command: mark/);
+  assert.match(marked.stderr, /usage: pnpm eval task mark <id>/);
 });
 
 test('the shell rejects leading unknown flags and forwards task flags', () => {

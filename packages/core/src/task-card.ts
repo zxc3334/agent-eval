@@ -20,6 +20,8 @@ export const PRIVATE_FIELD_ROLES = {
   pr: 'optional',
   merge: 'optional',
   interventions: 'optional',
+  rework: 'optional',
+  candidates: 'optional',
   verify: 'optional',
   sources: 'optional',
   not_replay_ready: 'optional',
@@ -27,7 +29,7 @@ export const PRIVATE_FIELD_ROLES = {
 
 const ROOT_KEYS = ['schema_version', 'id', 'status', 'public', 'private'] as const;
 const PUBLIC_KEYS = ['requirement', 'repo', 'base_commit'] as const;
-const PRIVATE_KEYS = ['provenance', 'pr', 'merge', 'interventions', 'verify', 'sources', 'not_replay_ready'] as const;
+const PRIVATE_KEYS = ['provenance', 'pr', 'merge', 'interventions', 'rework', 'candidates', 'verify', 'sources', 'not_replay_ready'] as const;
 const FORBIDDEN_KEYS = new Set(['gold', 'expected', 'answer', 'oracle']);
 const REPO_HOSTS = ['origin', 'github', 'other'] as const;
 const SOURCE_KINDS = ['pr', 'issue', 'chat', 'file'] as const;
@@ -75,10 +77,41 @@ export interface MergeValue {
   diff_stats?: DiffStats;
 }
 
+export const MARK_KINDS = ['intervention', 'rework'] as const;
+export type MarkKind = (typeof MARK_KINDS)[number];
+export const MARK_ORIGINS = ['fixup', 'review', 'chat', 'pr-review', 'manual'] as const;
+export type MarkOrigin = (typeof MARK_ORIGINS)[number];
+export const MARK_BOUNDARIES = ['submit', 'verify', 'human-confirm', 'later-run'] as const;
+export type MarkBoundary = (typeof MARK_BOUNDARIES)[number];
+
 export interface InterventionRecord {
   id: string;
   summary: string;
   source?: string;
+  /** Stable id within `source`. Dedupe key is source + turn. */
+  turn?: string;
+  kind?: MarkKind;
+  /** Present on rows written by `task mark`. Lists under interventions/rework are confirmed either way. */
+  confirmation?: 'confirmed';
+  excerpt?: string;
+  origin?: MarkOrigin;
+  boundary?: MarkBoundary;
+  /** Rework group. Records that share `round` are one rework round. */
+  round?: string;
+  provenance?: SourceRef;
+}
+
+/** Unconfirmed row. R3 fixup/review candidates live here and do not count until `task mark` confirms them. */
+export interface MarkCandidate {
+  id: string;
+  summary: string;
+  source: string;
+  turn: string;
+  excerpt: string;
+  origin: MarkOrigin;
+  provenance: SourceRef;
+  suggested?: MarkKind;
+  boundary?: MarkBoundary;
 }
 
 export type Interventions =
@@ -105,6 +138,8 @@ export interface TaskCard {
     pr?: PullRequestValue | OptionalGap;
     merge?: MergeValue | OptionalGap;
     interventions: Interventions;
+    rework?: Interventions;
+    candidates?: MarkCandidate[];
     verify: VerifyState;
     sources: SourceRef[];
     not_replay_ready?: { reason: string };
@@ -443,37 +478,84 @@ function readMerge(value: unknown, errors: CardIssue[]): MergeValue | OptionalGa
   return merge;
 }
 
-function readRecords(value: unknown, errors: CardIssue[]): InterventionRecord[] | undefined {
-  const field = 'private.interventions.records';
+const RECORD_KEYS = ['id', 'summary', 'source', 'turn', 'kind', 'confirmation', 'excerpt', 'origin', 'boundary', 'round', 'provenance'] as const;
+
+function readPlain(value: unknown, field: string, errors: CardIssue[]): string | undefined {
+  return nonempty(value, field, errors)?.trim();
+}
+
+function readRecord(item: unknown, path: string, listKind: MarkKind, errors: CardIssue[]): InterventionRecord | undefined {
+  if (!isObject(item)) {
+    errors.push({ field: path, message: 'expected id and summary' });
+    return undefined;
+  }
+  const before = errors.length;
+  rejectUnknown(item, RECORD_KEYS, path, errors);
+  const id = readIdentifier(item.id, `${path}.id`, errors);
+  const summary = readPlain(item.summary, `${path}.summary`, errors);
+  const record: InterventionRecord = { id: id ?? '', summary: summary ?? '' };
+  if ('source' in item) {
+    const source = readPlain(item.source, `${path}.source`, errors);
+    if (source) record.source = source;
+  }
+  if ('turn' in item) {
+    const turn = readPlain(item.turn, `${path}.turn`, errors);
+    if (turn) record.turn = turn;
+  }
+  if ('kind' in item) {
+    if (item.kind !== listKind) errors.push({ field: `${path}.kind`, message: `expected ${listKind}` });
+    else record.kind = listKind;
+  }
+  if ('confirmation' in item) {
+    if (item.confirmation !== 'confirmed') errors.push({ field: `${path}.confirmation`, message: 'records are confirmed events; unconfirmed rows belong in candidates' });
+    else record.confirmation = 'confirmed';
+  }
+  if ('excerpt' in item) {
+    const excerpt = readPlain(item.excerpt, `${path}.excerpt`, errors);
+    if (excerpt) record.excerpt = excerpt;
+  }
+  if ('origin' in item) {
+    if (typeof item.origin !== 'string' || !MARK_ORIGINS.includes(item.origin as MarkOrigin)) {
+      errors.push({ field: `${path}.origin`, message: 'expected fixup, review, chat, pr-review, or manual' });
+    } else {
+      record.origin = item.origin as MarkOrigin;
+    }
+  }
+  if ('boundary' in item) {
+    if (typeof item.boundary !== 'string' || !MARK_BOUNDARIES.includes(item.boundary as MarkBoundary)) {
+      errors.push({ field: `${path}.boundary`, message: 'expected submit, verify, human-confirm, or later-run' });
+    } else {
+      record.boundary = item.boundary as MarkBoundary;
+    }
+  }
+  if ('round' in item) {
+    const round = readPlain(item.round, `${path}.round`, errors);
+    if (round) record.round = round;
+  }
+  if ('provenance' in item) {
+    const provenance = readSource(item.provenance, `${path}.provenance`, errors);
+    if (provenance) record.provenance = provenance;
+  }
+  if (errors.length !== before || !id || !summary) return undefined;
+  record.id = id;
+  record.summary = summary;
+  return record;
+}
+
+function readRecords(value: unknown, field: string, listKind: MarkKind, errors: CardIssue[]): InterventionRecord[] | undefined {
   if (!Array.isArray(value) || value.length === 0) {
-    errors.push({ field, message: 'expected at least one confirmed intervention' });
+    errors.push({ field, message: 'expected at least one confirmed record' });
     return undefined;
   }
   const records: InterventionRecord[] = [];
   for (let index = 0; index < value.length; index += 1) {
-    const item = value[index];
-    const path = `${field}[${index}]`;
-    if (!isObject(item)) {
-      errors.push({ field: path, message: 'expected id and summary' });
-      continue;
-    }
-    const before = errors.length;
-    rejectUnknown(item, ['id', 'summary', 'source'], path, errors);
-    const id = readIdentifier(item.id, `${path}.id`, errors);
-    const summary = nonempty(item.summary, `${path}.summary`, errors);
-    let source: string | undefined;
-    if ('source' in item) source = nonempty(item.source, `${path}.source`, errors)?.trim();
-    if (errors.length === before && id && summary) {
-      const record: InterventionRecord = { id, summary };
-      if (source) record.source = source;
-      records.push(record);
-    }
+    const record = readRecord(value[index], `${field}[${index}]`, listKind, errors);
+    if (record) records.push(record);
   }
   return records.length === value.length ? records : undefined;
 }
 
-function readInterventions(value: unknown, errors: CardIssue[]): Interventions | undefined {
-  const field = 'private.interventions';
+function readInterventions(value: unknown, field: string, listKind: MarkKind, errors: CardIssue[]): Interventions | undefined {
   if (typeof value === 'number') {
     errors.push({ field, message: 'expected a status or a list of records, not a count' });
     return undefined;
@@ -495,7 +577,7 @@ function readInterventions(value: unknown, errors: CardIssue[]): Interventions |
     return undefined;
   }
   if ('records' in value) {
-    const records = readRecords(value.records, errors);
+    const records = readRecords(value.records, `${field}.records`, listKind, errors);
     return records ? { records } : undefined;
   }
   if (!('status' in value)) {
@@ -503,6 +585,67 @@ function readInterventions(value: unknown, errors: CardIssue[]): Interventions |
     return undefined;
   }
   return readOptionalGap(value, field, errors);
+}
+
+function readCandidate(item: unknown, path: string, errors: CardIssue[]): MarkCandidate | undefined {
+  if (!isObject(item)) {
+    errors.push({ field: path, message: 'expected a candidate' });
+    return undefined;
+  }
+  const before = errors.length;
+  rejectUnknown(item, ['id', 'summary', 'source', 'turn', 'excerpt', 'origin', 'provenance', 'suggested', 'boundary'], path, errors);
+  const id = readIdentifier(item.id, `${path}.id`, errors);
+  const summary = readPlain(item.summary, `${path}.summary`, errors);
+  const source = readPlain(item.source, `${path}.source`, errors);
+  const turn = readPlain(item.turn, `${path}.turn`, errors);
+  const excerpt = readPlain(item.excerpt, `${path}.excerpt`, errors);
+  if (typeof item.origin !== 'string' || !MARK_ORIGINS.includes(item.origin as MarkOrigin)) {
+    errors.push({ field: `${path}.origin`, message: 'expected fixup, review, chat, pr-review, or manual' });
+  }
+  const provenance = readSource(item.provenance, `${path}.provenance`, errors);
+  let suggested: MarkKind | undefined;
+  if ('suggested' in item) {
+    if (item.suggested !== 'intervention' && item.suggested !== 'rework') {
+      errors.push({ field: `${path}.suggested`, message: 'expected intervention or rework' });
+    } else {
+      suggested = item.suggested;
+    }
+  }
+  let boundary: MarkBoundary | undefined;
+  if ('boundary' in item) {
+    if (typeof item.boundary !== 'string' || !MARK_BOUNDARIES.includes(item.boundary as MarkBoundary)) {
+      errors.push({ field: `${path}.boundary`, message: 'expected submit, verify, human-confirm, or later-run' });
+    } else {
+      boundary = item.boundary as MarkBoundary;
+    }
+  }
+  if (errors.length !== before || !id || !summary || !source || !turn || !excerpt || !provenance || typeof item.origin !== 'string') return undefined;
+  const candidate: MarkCandidate = {
+    id,
+    summary,
+    source,
+    turn,
+    excerpt,
+    origin: item.origin as MarkOrigin,
+    provenance,
+  };
+  if (suggested) candidate.suggested = suggested;
+  if (boundary) candidate.boundary = boundary;
+  return candidate;
+}
+
+function readCandidates(value: unknown, errors: CardIssue[]): MarkCandidate[] | undefined {
+  const field = 'private.candidates';
+  if (!Array.isArray(value)) {
+    errors.push({ field, message: 'expected a list of candidates' });
+    return undefined;
+  }
+  const candidates: MarkCandidate[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const candidate = readCandidate(value[index], `${field}[${index}]`, errors);
+    if (candidate) candidates.push(candidate);
+  }
+  return candidates.length === value.length ? candidates : undefined;
 }
 
 function readVerify(value: unknown, errors: CardIssue[]): VerifyState | undefined {
@@ -626,8 +769,16 @@ export function validateTaskCard(value: unknown, options: { expectedId?: string 
         if (merge) privateSection.merge = merge;
       }
       if ('interventions' in value.private) {
-        const interventions = readInterventions(value.private.interventions, errors);
+        const interventions = readInterventions(value.private.interventions, 'private.interventions', 'intervention', errors);
         if (interventions) privateSection.interventions = interventions;
+      }
+      if ('rework' in value.private) {
+        const rework = readInterventions(value.private.rework, 'private.rework', 'rework', errors);
+        if (rework) privateSection.rework = rework;
+      }
+      if ('candidates' in value.private) {
+        const candidates = readCandidates(value.private.candidates, errors);
+        if (candidates) privateSection.candidates = candidates;
       }
       if ('verify' in value.private) {
         const verify = readVerify(value.private.verify, errors);
