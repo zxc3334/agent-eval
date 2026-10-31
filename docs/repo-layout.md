@@ -7,7 +7,7 @@
 ```text
 agent-eval/
   packages/core/     薄底座：跑次目录、预留的证据钩子、CLI 壳、配置原语
-  tracks/skill/      当前唯一实施线（noop、task、replay、verify）
+  tracks/skill/      当前唯一实施线（noop、task、replay、verify、metrics）
   tracks/agent/      占位 README，不实现
   tracks/model/      占位 README，不实现
   tasks/             真实任务卡，格式见 docs/task-card.md
@@ -32,7 +32,7 @@ agent-eval/
 | agent | `tracks/agent` | 不实施、不拆票。产品 agent 闭环的位置 |
 | model | `tracks/model` | 不实施、不拆票。模型能力题的位置 |
 
-共用底座在 `packages/core`。结构、采集、格式、CLI 落在 core；重放、可选 verify、指标、对比落在 `tracks/skill`。任务卡格式和从已合 PR 导入见 [task-card.md](task-card.md)。插手 / 返工的计数和 provenance 在 [marks.md](marks.md)。重放见 [replay.md](replay.md)。可选 verify 判分见 [verify.md](verify.md)。指标和对比还不在本波。
+共用底座在 `packages/core`。结构、采集、格式、CLI 落在 core；重放、可选 verify、指标、对比落在 `tracks/skill`。任务卡格式和从已合 PR 导入见 [task-card.md](task-card.md)。插手 / 返工的计数和 provenance 在 [marks.md](marks.md)。重放见 [replay.md](replay.md)。可选 verify 判分见 [verify.md](verify.md)。每个 variant 的指标见 [metrics.md](metrics.md)。多任务对比还不在本波。
 
 ## 依赖规则
 
@@ -60,9 +60,10 @@ pnpm eval noop
 pnpm eval task --help
 pnpm eval replay --help
 pnpm eval verify --help
+pnpm eval metrics --help
 ```
 
-`pnpm eval` 进入薄壳：没有子命令时打印帮助；`noop` 是 skill track 注册的空命令，退出码 0，输出 `skill noop: ok`。这证明壳能挂载 track。`task` 录入、列出、查看、校验，并从已合 PR 导入任务卡，也确认插手 / 返工，用法见 [task-card.md](task-card.md) 和 [marks.md](marks.md)。`replay` 从 base commit 起用 Cursor Agent 各跑一遍有 skill 和没有 skill，用法见 [replay.md](replay.md)。`verify` 在重放之后用钉死的 verify 判分；没有 verify 时分数是 unavailable，用法见 [verify.md](verify.md)。写在命令名后面的参数属于该命令，例如 `pnpm eval task validate --offline`。写在命令名前面的未知参数仍然由壳拒绝。
+`pnpm eval` 进入薄壳：没有子命令时打印帮助；`noop` 是 skill track 注册的空命令，退出码 0，输出 `skill noop: ok`。这证明壳能挂载 track。`task` 录入、列出、查看、校验，并从已合 PR 导入任务卡，也确认插手 / 返工，用法见 [task-card.md](task-card.md) 和 [marks.md](marks.md)。`replay` 从 base commit 起用 Cursor Agent 各跑一遍有 skill 和没有 skill，用法见 [replay.md](replay.md)。`verify` 在重放之后用钉死的 verify 判分；没有 verify 时分数是 unavailable，用法见 [verify.md](verify.md)。`metrics` 在重放之后写出每个 variant 的 `metrics.json`；没有 verify 时证据完整度是 N/A，用法见 [metrics.md](metrics.md)。写在命令名后面的参数属于该命令，例如 `pnpm eval task validate --offline`。写在命令名前面的未知参数仍然由壳拒绝。
 
 M0 本地冒烟仍走原来的入口：
 
@@ -75,10 +76,10 @@ pnpm eval:m0 --help
 
 ## runs/
 
-克隆之后 `runs/` 存在。跑次产物匹配 `runs/*`，被 git 忽略；`runs/.gitkeep` 保留在版本库里。`noop`、`--help` 和 `task` 不创建跑次。`replay` 把证据写进 `runs/<run-id>/variants/<name>/`。`verify` 把判分证据写进同一次 run 的 `verify/` 和 `variants/<name>/verify/`。
+克隆之后 `runs/` 存在。跑次产物匹配 `runs/*`，被 git 忽略；`runs/.gitkeep` 保留在版本库里。`noop`、`--help` 和 `task` 不创建跑次。`replay` 把证据写进 `runs/<run-id>/variants/<name>/`。`verify` 把判分证据写进同一次 run 的 `verify/` 和 `variants/<name>/verify/`。`metrics` 在同一 variant 目录写下 `metrics.json`。
 
 ## 本波不做
 
-指标、对比、本地 Web、gold、对 Origin 或 GitHub 写操作、多模型矩阵。任务卡格式和只读导入见 [task-card.md](task-card.md)。插手 / 返工确认见 [marks.md](marks.md)。重放见 [replay.md](replay.md)。可选 verify 判分见 [verify.md](verify.md)。不要求目标仓创建 verify skill。缺 verify 也可以重放，分数是 unavailable。
+多任务对比、本地 Web、gold、对 Origin 或 GitHub 写操作、多模型矩阵。任务卡格式和只读导入见 [task-card.md](task-card.md)。插手 / 返工确认见 [marks.md](marks.md)。重放见 [replay.md](replay.md)。可选 verify 判分见 [verify.md](verify.md)。指标见 [metrics.md](metrics.md)。不要求目标仓创建 verify skill。缺 verify 也可以重放，分数是 unavailable，证据完整度是 N/A。
 
 E0–E2 留在 `src/` 与 `cases/`。本票没有把 `feat/e11` 整包合并进来，也没有搬迁冒烟运行器。后续票再按需把可复用模块迁进 core 或 skill。

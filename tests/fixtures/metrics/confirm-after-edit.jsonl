@@ -1,0 +1,7 @@
+{"type":"system","subtype":"init","model":"composer"}
+{"type":"user","message":{"content":[{"type":"text","text":"Add hello.txt that says replayed."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Writing the file."}]}}
+{"type":"tool_call","subtype":"started","tool_call":{"writeToolCall":{"args":{"path":"hello.txt"}}}}
+{"type":"tool_call","subtype":"completed","tool_call":{"writeToolCall":{"args":{"path":"hello.txt","contents":"replayed\n"}}}}
+{"type":"interaction","subtype":"response","text":"looks good"}
+{"type":"result","subtype":"success","result":"done"}

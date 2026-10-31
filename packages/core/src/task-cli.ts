@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { stringify } from 'yaml';
 import type { Command } from './cli.ts';
+import { identifier } from './config.ts';
 import { assessCommit } from './sha.ts';
 import { SHA_FORMAT_MESSAGE, canonicalSha } from './sha.ts';
 import { MarkPlanError } from './marks.ts';
@@ -11,6 +12,7 @@ import { parseTaskCardYaml } from './task-card.ts';
 import type { TaskCard } from './task-card.ts';
 import { ImportError, runImport } from './task-import.ts';
 import { executeMark } from './task-mark.ts';
+import { describeRunMetrics } from './metrics.ts';
 import { describeCard, formatList, listCellsFromText } from './task-view.ts';
 
 const TASK_HELP = [
@@ -19,7 +21,7 @@ const TASK_HELP = [
   'Usage:',
   '  pnpm eval task add [--root <dir>]',
   '  pnpm eval task list [--root <dir>]',
-  '  pnpm eval task show <id> [--root <dir>] [--offline] [--repo-dir <dir>]',
+  '  pnpm eval task show <id> [--root <dir>] [--run <run-id>] [--runs-dir <dir>] [--offline] [--repo-dir <dir>]',
   '  pnpm eval task validate [id] [--root <dir>] [--offline] [--repo-dir <dir>]',
   '  pnpm eval task import --pr <owner/repo#N> [--pr <owner/repo#N> ...]',
   '  pnpm eval task import --origin <owner/repo#N>',
@@ -55,6 +57,11 @@ const TASK_HELP = [
   '',
   'show prints none, todo, unknown, N/A, and unavailable as statuses.',
   'Only schema problems are marked error.',
+  '',
+  'show --run prints metrics.json written by `pnpm eval metrics`. It reads the',
+  'files and does not count the event stream again. A run with no metrics.json',
+  'says "not collected". It does not print 0 for a missing measurement.',
+  'Evidence completeness stays N/A when the score is unavailable.',
   '',
   'validate prints one result per field. SHA format is checked without git.',
   'Commit existence is unavailable when --offline is set or no local checkout',
@@ -538,10 +545,23 @@ async function reportFile(
   return { schemaOk: true, existence, lines };
 }
 
-async function runShow(root: string, id: string, flags: { offline: boolean; repoDir?: string }): Promise<number> {
+async function runShow(
+  root: string,
+  id: string,
+  flags: { offline: boolean; repoDir?: string; runId?: string; runsDir?: string },
+): Promise<number> {
   const file = cardFile(root, id);
   const report = await reportFile(id, file, root, flags, true);
-  process.stdout.write(`${report.lines.join('\n')}\n`);
+  const lines = [...report.lines];
+  if (flags.runId) {
+    const runsDir = resolve(flags.runsDir ?? join(root, 'runs'));
+    const runDir = join(runsDir, flags.runId);
+    if (!existsSync(runDir) || !statSync(runDir).isDirectory()) {
+      throw new TaskCliError(`run not found: ${flags.runId}`);
+    }
+    lines.push(...describeRunMetrics(runDir, flags.runId));
+  }
+  process.stdout.write(`${lines.join('\n')}\n`);
   return report.schemaOk ? 0 : 1;
 }
 
@@ -581,6 +601,8 @@ interface Flags {
   type?: string;
   source?: string;
   round?: string;
+  runId?: string;
+  runsDir?: string;
   positionals: string[];
 }
 
@@ -612,6 +634,8 @@ function readFlags(args: readonly string[]): Flags {
         type: { type: 'string' },
         source: { type: 'string' },
         round: { type: 'string' },
+        run: { type: 'string' },
+        'runs-dir': { type: 'string' },
       },
     });
     return {
@@ -631,6 +655,8 @@ function readFlags(args: readonly string[]): Flags {
       type: values.type,
       source: values.source,
       round: values.round,
+      runId: values.run,
+      runsDir: values['runs-dir'],
       positionals,
     };
   } catch (error) {
@@ -670,6 +696,16 @@ async function dispatch(args: readonly string[]): Promise<number> {
   if (sub !== 'mark' && markOnly) throw new TaskCliError(`task ${sub}: unknown option`);
   if (sub !== 'import' && sub !== 'mark' && flags.files.length > 0) {
     throw new TaskCliError(`task ${sub}: --from-file is only valid for task import or task mark`);
+  }
+  if ((flags.runId || flags.runsDir) && sub !== 'show') {
+    throw new TaskCliError(`task ${sub}: --run is only valid for task show`);
+  }
+  if (flags.runId) {
+    try {
+      identifier(flags.runId, 'run');
+    } catch (error) {
+      throw new TaskCliError((error as Error).message);
+    }
   }
   if (sub === 'import') {
     if (rest.length > 0) throw new TaskCliError('usage: pnpm eval task import --pr <owner/repo#N>');
@@ -711,7 +747,7 @@ async function dispatch(args: readonly string[]): Promise<number> {
   if (sub === 'show') {
     const id = checkId(rest[0], 'usage: pnpm eval task show <id>');
     if (rest.length !== 1) throw new TaskCliError('usage: pnpm eval task show <id>');
-    return runShow(root, id, lookup);
+    return runShow(root, id, { ...lookup, runId: flags.runId, runsDir: flags.runsDir });
   }
   if (sub === 'validate') {
     if (rest.length > 1) throw new TaskCliError('usage: pnpm eval task validate [id]');

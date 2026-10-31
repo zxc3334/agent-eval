@@ -1,5 +1,6 @@
 import type { Track } from '../../../packages/core/src/cli.ts';
 import { taskCommand } from '../../../packages/core/src/task-cli.ts';
+import { metricsCommand } from './metrics-cli.ts';
 import { replayCommand } from './replay-cli.ts';
 import { verifyCommand } from './verify-cli.ts';
 
@@ -23,5 +24,6 @@ export const skillTrack: Track = {
     taskCommand,
     replayCommand,
     verifyCommand,
+    metricsCommand,
   ],
 };

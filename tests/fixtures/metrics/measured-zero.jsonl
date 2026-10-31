@@ -1,0 +1,4 @@
+{"type":"system","subtype":"init","model":"composer"}
+{"type":"user","message":{"content":[{"type":"text","text":"Add hello.txt that says replayed."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Nothing to ask."}]}}
+{"type":"result","subtype":"success","result":"done","usage":{"input_tokens":0,"output_tokens":4}}

@@ -43,6 +43,12 @@ export interface CountOrUnknown {
 export interface TokenUsage {
   input_tokens: number | 'unknown';
   output_tokens: number | 'unknown';
+  /** Adapter-reported cost. A missing field is `unknown`, not 0. A measured 0 stays 0. */
+  cost: number | 'unknown';
+}
+
+export interface InterventionCursor {
+  userEvents: number;
 }
 
 export interface InstalledSkill {
@@ -99,7 +105,7 @@ function eventText(raw: Record<string, unknown>): string {
   return '';
 }
 
-function toolName(raw: Record<string, unknown>): string | undefined {
+export function streamToolName(raw: Record<string, unknown>): string | undefined {
   const call = raw.tool_call ?? raw.tool;
   if (typeof call === 'string') return call;
   if (typeof call !== 'object' || call === null) return undefined;
@@ -110,8 +116,29 @@ function toolName(raw: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
+/**
+ * One event, one kind. A request is never also an actual.
+ * The first `user` event is the prompt echo. A later `user` event is an actual.
+ * A question tool is a request, not a second copy of an `interaction` request.
+ */
+export function interventionKind(event: StreamEvent, cursor: InterventionCursor): 'request' | 'actual' | 'none' {
+  if (event.type === 'interaction' && event.subtype === 'request') return 'request';
+  if (event.type === 'interaction' && event.subtype === 'response') return 'actual';
+  if (event.type === 'user') {
+    cursor.userEvents += 1;
+    return cursor.userEvents > 1 ? 'actual' : 'none';
+  }
+  if (event.type === 'tool_call' && QUESTION_TOOLS.has(streamToolName(event.raw) ?? '')) return 'request';
+  return 'none';
+}
+
 function tokenField(usage: Record<string, unknown>, snake: string, camel: string): number | 'unknown' {
   const value = usage[snake] ?? usage[camel];
+  return typeof value === 'number' && Number.isFinite(value) ? value : 'unknown';
+}
+
+function costField(usage: Record<string, unknown>): number | 'unknown' {
+  const value = usage.cost ?? usage.total_cost ?? usage.totalCost;
   return typeof value === 'number' && Number.isFinite(value) ? value : 'unknown';
 }
 
@@ -122,8 +149,8 @@ function tokenField(usage: Record<string, unknown>, snake: string, camel: string
  *   intervention-request. The adapter does not write an answer.
  * - `interaction` / `response`, or a `user` event after the initial prompt
  *   echo, is an actual-intervention.
- * - Token counts come only from `result.usage`. A missing field is `unknown`,
- *   not 0. A measured 0 stays 0.
+ * - Token counts and cost come only from `result.usage`. A missing field is
+ *   `unknown`, not 0. A measured 0 stays 0. Cost is not derived from tokens.
  * - If the process never started, or it was interrupted before any event,
  *   intervention counts are `unknown`.
  */
@@ -133,19 +160,18 @@ export function summarizeCursorStream(events: readonly StreamEvent[], observed: 
 } {
   const requests: { text: string }[] = [];
   const actuals: { text: string }[] = [];
-  let userEvents = 0;
-  let usage: TokenUsage = { input_tokens: 'unknown', output_tokens: 'unknown' };
+  const cursor: InterventionCursor = { userEvents: 0 };
+  let usage: TokenUsage = { input_tokens: 'unknown', output_tokens: 'unknown', cost: 'unknown' };
 
   for (const event of events) {
-    if (event.type === 'interaction' && event.subtype === 'request') {
-      requests.push({ text: eventText(event.raw) });
-    } else if (event.type === 'interaction' && event.subtype === 'response') {
+    const kind = interventionKind(event, cursor);
+    if (kind === 'request') {
+      const text = eventText(event.raw);
+      requests.push({
+        text: text || (event.type === 'tool_call' ? (streamToolName(event.raw) ?? 'question') : ''),
+      });
+    } else if (kind === 'actual') {
       actuals.push({ text: eventText(event.raw) });
-    } else if (event.type === 'user') {
-      userEvents += 1;
-      if (userEvents > 1) actuals.push({ text: eventText(event.raw) });
-    } else if (event.type === 'tool_call' && QUESTION_TOOLS.has(toolName(event.raw) ?? '')) {
-      requests.push({ text: eventText(event.raw) || (toolName(event.raw) ?? 'question') });
     }
     if (event.type === 'result') {
       const rawUsage = event.raw.usage;
@@ -154,6 +180,7 @@ export function summarizeCursorStream(events: readonly StreamEvent[], observed: 
         usage = {
           input_tokens: tokenField(obj, 'input_tokens', 'inputTokens'),
           output_tokens: tokenField(obj, 'output_tokens', 'outputTokens'),
+          cost: costField(obj),
         };
       }
     }

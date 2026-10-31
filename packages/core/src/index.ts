@@ -1,4 +1,22 @@
 export { formatHelp, runCli } from './cli.ts';
+export {
+  METRICS_SCHEMA_VERSION,
+  buildVariantMetrics,
+  compareMetric,
+  describeRunMetrics,
+  evidenceCompleteness,
+  formatMetricValue,
+  formatVariantMetrics,
+  parseVariantMetrics,
+} from './metrics.ts';
+export type {
+  BaselineSide,
+  EvidenceCompleteness,
+  MeasuredNumber,
+  MetricComparison,
+  MetricFeatureRow,
+  VariantMetrics,
+} from './metrics.ts';
 export type { Command, CommandResult, Track } from './cli.ts';
 export { taskCommand } from './task-cli.ts';
 export {
