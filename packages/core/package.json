@@ -1,0 +1,10 @@
+{
+  "name": "@agent-eval/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Thin base: run directories, reserved evidence hooks, CLI shell, config primitives.",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

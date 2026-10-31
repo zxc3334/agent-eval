@@ -1,5 +1,6 @@
 node_modules/
 .pnpm-store/
-runs/
+runs/*
+!runs/.gitkeep
 _codex_out/
 *.tsbuildinfo
