@@ -7,7 +7,7 @@
 ```text
 agent-eval/
   packages/core/     薄底座：跑次目录、预留的证据钩子、CLI 壳、配置原语
-  tracks/skill/      当前唯一实施线（noop，以及 task 录入命令）
+  tracks/skill/      当前唯一实施线（noop，以及 task 录入和导入）
   tracks/agent/      占位 README，不实现
   tracks/model/      占位 README，不实现
   tasks/             真实任务卡，格式见 docs/task-card.md
@@ -32,7 +32,7 @@ agent-eval/
 | agent | `tracks/agent` | 不实施、不拆票。产品 agent 闭环的位置 |
 | model | `tracks/model` | 不实施、不拆票。模型能力题的位置 |
 
-共用底座在 `packages/core`。结构、采集、格式、CLI 落在 core；重放、可选 verify、指标、对比落在 `tracks/skill`。任务卡格式在 [task-card.md](task-card.md)。重放、判分、指标、对比都不在本票。
+共用底座在 `packages/core`。结构、采集、格式、CLI 落在 core；重放、可选 verify、指标、对比落在 `tracks/skill`。任务卡格式和从已合 PR 导入见 [task-card.md](task-card.md)。重放、判分、指标、对比、插手标记都不在本票。
 
 ## 依赖规则
 
@@ -60,7 +60,7 @@ pnpm eval noop
 pnpm eval task --help
 ```
 
-`pnpm eval` 进入薄壳：没有子命令时打印帮助；`noop` 是 skill track 注册的空命令，退出码 0，输出 `skill noop: ok`。这证明壳能挂载 track。`task` 录入、列出、查看和校验任务卡，用法见 [task-card.md](task-card.md)。写在命令名后面的参数属于该命令，例如 `pnpm eval task validate --offline`。写在命令名前面的未知参数仍然由壳拒绝。
+`pnpm eval` 进入薄壳：没有子命令时打印帮助；`noop` 是 skill track 注册的空命令，退出码 0，输出 `skill noop: ok`。这证明壳能挂载 track。`task` 录入、列出、查看、校验，并从已合 PR 导入任务卡，用法见 [task-card.md](task-card.md)。写在命令名后面的参数属于该命令，例如 `pnpm eval task validate --offline`。写在命令名前面的未知参数仍然由壳拒绝。
 
 M0 本地冒烟仍走原来的入口：
 
@@ -77,6 +77,6 @@ pnpm eval:m0 --help
 
 ## 本波不做
 
-导入、插手标记、重放、verify 判分、指标、对比、本地 Web、gold。任务卡格式见 [task-card.md](task-card.md)。不要求目标仓创建 verify skill。
+插手标记、重放、verify 判分、指标、对比、本地 Web、gold、对 Origin 或 GitHub 写操作。任务卡格式和只读导入见 [task-card.md](task-card.md)。不要求目标仓创建 verify skill。
 
 E0–E2 留在 `src/` 与 `cases/`。本票没有把 `feat/e11` 整包合并进来，也没有搬迁冒烟运行器。后续票再按需把可复用模块迁进 core 或 skill。

@@ -1,0 +1,28 @@
+{
+  "recorded_from": "Synthetic export used only to exercise the non-default base prompt. Not a captured pull request.",
+  "host": "origin",
+  "repo": "example/stacked",
+  "default_branch": "main",
+  "verify": "none",
+  "number": 4,
+  "title": "Synthetic stacked child",
+  "url": "https://cursor.com/codebase/example/stacked/pull/4",
+  "base_ref": "feature/parent",
+  "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "head_ref": "feature/child",
+  "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "stack_id": "stk_example",
+  "description": "Synthetic child change. Not a real request.",
+  "comments": [
+    {
+      "kind": "review",
+      "body": "Synthetic review note, not confirmed."
+    }
+  ],
+  "commits": [
+    {
+      "oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "messageHeadline": "fixup! address review on the parent branch"
+    }
+  ]
+}

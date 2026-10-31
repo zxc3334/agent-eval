@@ -59,7 +59,7 @@ function add(dir: string, lines: readonly string[], env?: NodeJS.ProcessEnv) {
   return { ...result, file };
 }
 
-test('task help lists add, list, show, and validate', () => {
+test('task help lists add, list, show, validate, and import', () => {
   for (const args of [['task'], ['task', '--help'], ['task', 'add', '--help']]) {
     const help = evalCli(args);
     assert.equal(help.status, 0, help.stderr);
@@ -67,13 +67,15 @@ test('task help lists add, list, show, and validate', () => {
     assert.match(help.stdout, /pnpm eval task list/);
     assert.match(help.stdout, /pnpm eval task show <id>/);
     assert.match(help.stdout, /pnpm eval task validate \[id\]/);
+    assert.match(help.stdout, /pnpm eval task import --pr <owner\/repo#N>/);
+    assert.match(help.stdout, /--from-file/);
     assert.match(help.stdout, /missing verify is not an error/i);
-    assert.equal(help.stdout.includes('import'), false);
+    assert.match(help.stdout, /does not block the card/i);
   }
 
   const imported = evalCli(['task', 'import']);
   assert.equal(imported.status, 2);
-  assert.match(imported.stderr, /unknown task command: import/);
+  assert.match(imported.stderr, /usage: pnpm eval task import --pr/);
 
   const marked = evalCli(['task', 'mark']);
   assert.equal(marked.status, 2);
@@ -562,6 +564,7 @@ test('task card doc describes the entry commands and the verify column', () => {
   assert.match(doc, /pnpm eval task list/);
   assert.match(doc, /pnpm eval task show <id>/);
   assert.match(doc, /pnpm eval task validate \[id\]/);
+  assert.match(doc, /pnpm eval task import --pr <owner\/repo#N>/);
   assert.match(doc, /都不是 error/);
   assert.match(doc, /存在性是 `unavailable`，退出码是 0/);
 });

@@ -145,7 +145,7 @@ AgentInput 只从允许列表投影，不把整张卡展开：
 
 ## CLI
 
-`pnpm eval task` 挂在 R1 的入口上。它只录入和检查卡片，不导入 Origin，也不标记插手。
+`pnpm eval task` 挂在 R1 的入口上。它录入、检查，也从已合 PR 导入。它不标记插手。
 
 ```sh
 pnpm eval task --help
@@ -153,7 +153,41 @@ pnpm eval task add
 pnpm eval task list
 pnpm eval task show <id>
 pnpm eval task validate [id]
+pnpm eval task import --pr <owner/repo#N>
+pnpm eval task import --origin <owner/repo#N>
+pnpm eval task import --from-file <export.json>
 ```
+
+## 从已合 PR 导入
+
+`import` 读一张已合 PR，先给出候选，确认之后才写 `tasks/<id>/card.yaml`。第一条路径是 Cursor Origin，只跑 `origin repo view` 和 `origin pr view`。GitHub 只是可选对照，读不到也不阻塞。Origin 没登录、离线，或命令不存在时，用 `--from-file` 读已经导出的 JSON 或 markdown。错误会写明原因，并且不会留下半截 `card.yaml`。
+
+PR 描述和 PR base SHA 只是候选。它们不是用户原话，也不是任务真正的起始 commit。提示里选 `accept` 才会抄进卡；否则这两项保持 `todo`，原因里写明候选没有被当成起点。评审和 fixup 只作为未确认候选记在 `sources`，`interventions` 保持 `todo` 或 `unknown`，不会写成记录，也不会写成 0。base 分支不是仓库默认分支，或 PR 在 stack 里时，命令只提示，不拆、不并。缺 verify 写成 `none` 或 `todo`，仍然建卡。
+
+批量时每条单独确认。`reject` 和 `skip` 不写这一条。前面确认过的可以留下。某一条读取或写入失败，不会把那一条写成半个文件。
+
+`--from-file` 接受三种 JSON：单个对象、数组，或 `{ "items": [ ... ] }`。对象可以是下面这种导出，也可以是 `origin pr view --json` 或 `gh pr view --json` 的原文（缺 `repo` 时加 `--repo owner/name`）。
+
+```json
+{
+  "host": "origin",
+  "repo": "owner/name",
+  "default_branch": "main",
+  "verify": "none",
+  "number": 8,
+  "url": "https://cursor.com/codebase/owner/name/pull/8",
+  "base_ref": "main",
+  "base_sha": "0123456789abcdef0123456789abcdef01234567",
+  "requirement_candidates": [
+    { "kind": "linked_issue", "ref": "https://example.test/issue", "text": "当时的需求原文候选。" }
+  ],
+  "comments": [
+    { "kind": "review", "body": "未确认的评审意见。" }
+  ]
+}
+```
+
+markdown 用 front matter 写同样的字段。`## requirement candidate`、`## review`、`## fixup` 是候选，不会被静默当成起点。
 
 `add` 按字段提问，几分钟内能写完。需求原文可以多行输入（单独一行 `.` 结束）、从文件读，或从剪贴板读。可以存成 draft。需求原文、仓库、base commit 都是具体值时才接受 `replay-ready`；否则改存 draft，并要求写出原因。成功时打印 `tasks/<id>/card.yaml` 的路径。
 
@@ -167,4 +201,4 @@ pnpm eval task validate [id]
 
 ## 不做
 
-gold、期望输出、重放、判分、强制创建 verify、数据库、Web UI、Origin 导入、插手标记。
+gold、期望输出、重放、判分、强制创建 verify、数据库、Web UI、对 Origin 或 GitHub 写操作、自动判定插手、插手标记。

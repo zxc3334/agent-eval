@@ -1,0 +1,26 @@
+{
+  "recorded_from": "Captured with gh pr view 1 --repo zxc3334/agent-eval on 2026-10-31. default_branch is main from gh repo view. verify none matches this repository, which has no project verify.",
+  "host": "github",
+  "repo": "zxc3334/agent-eval",
+  "default_branch": "main",
+  "verify": "none",
+  "pull": {
+    "additions": 873,
+    "baseRefName": "main",
+    "baseRefOid": "bf2477ff55037527d23582830e7fffbae0a0a738",
+    "body": "<!-- CURSOR_AGENT_PR_BODY_BEGIN -->\n## Summary\n\nSeeds the M1 local stub harness (Notion issues E0 / E1 / E2) onto `main`. This is a deterministic TypeScript eval CLI with a stub agent only: no model, API key, Docker, or bot.\n\n- **E0** — one-command stub red/green smoke. `pnpm eval --suite smoke --agent stub` expects 1 pass + 1 hard-assertion fail and exit 1.\n- **E1** — fail fast with interrupt evidence. Fault statuses stay distinct, Ctrl-C/SIGTERM cleans the process group, and the run exits 2.\n- **E2** — single-case rerun and hot-edit feedback via `--case`, `--failed-from`, and `--watch`.\n\nIssues stay in Notion. Do not open GitHub Issues for this repo.\n\n- Tickets index: https://app.notion.com/p/405e1347ee9781a39505dae9b7f5b189\n- E0: https://app.notion.com/405e1347ee978196b7c7e682ddabe7c2\n- E1: https://app.notion.com/405e1347ee97810c9934e82b2b8c5f35\n- E2: https://app.notion.com/405e1347ee978176b77cc486100195d8\n\n`main` already had a one-line README commit, so this branch replaces it with the harness docs and adds the Notion issue links above. `_codex_out` (local agent scratch: prompts, pid/stdout/stderr, validation dumps) is omitted. `node_modules/`, `.pnpm-store/`, `runs/`, and `_codex_out/` are gitignored.\n\n## Verification\n\nRan on Linux with Node v24.22.1 and pnpm 11.19.0 (matches `packageManager` and `engines`).\n\n- `pnpm install` — exit 0 (`typescript` 5.7.3, `@types/node` 20.17.19)\n- `pnpm test` — exit 0, 12/12 passed (~13.6s)\n- `pnpm typecheck` — exit 0\n\n## Test plan\n\n- [ ] `pnpm install`\n- [ ] `pnpm eval --suite smoke --agent stub` (expect exit 1: smoke-pass + smoke-fail)\n- [ ] `pnpm test`\n- [ ] `pnpm typecheck`\n<!-- CURSOR_AGENT_PR_BODY_END -->\n\n<div><a href=\"https://cursor.com/agents/bc-dd3ee637-f228-57c6-9e0a-e94cd2afb4a5?cursor_ref=pr_footer&cursor_cta=open_in_web\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/assets/images/open-in-web-dark.png\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/assets/images/open-in-web-light.png\"><img alt=\"Open in Web\" width=\"114\" height=\"28\" src=\"https://cursor.com/assets/images/open-in-web-dark.png\"></picture></a>&nbsp;<a href=\"https://cursor.com/background-agent?bcId=bc-dd3ee637-f228-57c6-9e0a-e94cd2afb4a5&cursor_ref=pr_footer&cursor_cta=open_in_cursor\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/assets/images/open-in-cursor-dark.png\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/assets/images/open-in-cursor-light.png\"><img alt=\"Open in Cursor\" width=\"131\" height=\"28\" src=\"https://cursor.com/assets/images/open-in-cursor-dark.png\"></picture></a>&nbsp;</div>\n\n",
+    "changedFiles": 48,
+    "comments": [],
+    "deletions": 1,
+    "headRefName": "feat/m1-smoke-e0-e2",
+    "headRefOid": "33b2644798aee4fc0d11a868cdd43328452ab5ee",
+    "mergeCommit": {
+      "oid": "ed4b70c0fc8b93d02fd2d8b770b141ae88eb1004"
+    },
+    "number": 1,
+    "reviews": [],
+    "state": "MERGED",
+    "title": "feat(m1): E0–E2 stub smoke / fail locate / single-case rerun",
+    "url": "https://github.com/zxc3334/agent-eval/pull/1"
+  }
+}

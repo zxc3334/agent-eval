@@ -8,6 +8,7 @@ import { assessCommit } from './sha.ts';
 import { SHA_FORMAT_MESSAGE, canonicalSha } from './sha.ts';
 import { parseTaskCardYaml } from './task-card.ts';
 import type { TaskCard } from './task-card.ts';
+import { ImportError, runImport } from './task-import.ts';
 import { describeCard, formatList, listCellsFromText } from './task-view.ts';
 
 const TASK_HELP = [
@@ -18,6 +19,24 @@ const TASK_HELP = [
   '  pnpm eval task list [--root <dir>]',
   '  pnpm eval task show <id> [--root <dir>] [--offline] [--repo-dir <dir>]',
   '  pnpm eval task validate [id] [--root <dir>] [--offline] [--repo-dir <dir>]',
+  '  pnpm eval task import --pr <owner/repo#N> [--pr <owner/repo#N> ...]',
+  '  pnpm eval task import --origin <owner/repo#N>',
+  '  pnpm eval task import --from-file <export.json|export.md> [--from-file ...]',
+  '',
+  'import reads a merged pull request and proposes a task card. The first source',
+  'is Cursor Origin, read-only (`origin pr view` / `origin repo view`). GitHub is',
+  'optional and is not required. --from-file reads a JSON or markdown export when',
+  'Origin is offline or not authenticated. Nothing is written until that item is',
+  'confirmed. reject or skip writes no file. A batch may write some items and',
+  'leave the rest unwritten. A failed write does not leave a partial card.yaml.',
+  '',
+  'PR description and PR base SHA are candidates. They are not the original user',
+  'utterance or the original start commit. accept copies a candidate only after',
+  'you say so; otherwise the field stays todo. Review and fixup notes stay',
+  'unconfirmed candidates. They are not intervention records and are never 0.',
+  'A base branch other than the repository default is only annotated. Stacked',
+  'pull requests are not split or merged. Missing verify is none or todo and',
+  'does not block the card.',
   '',
   'add asks for each field. Requirement text can come from multiline input',
   '(end with a line that is only "."), a file, or the clipboard.',
@@ -536,6 +555,12 @@ interface Flags {
   root?: string;
   offline: boolean;
   repoDir?: string;
+  prs: string[];
+  origins: string[];
+  files: string[];
+  host?: string;
+  repo?: string;
+  id?: string;
   positionals: string[];
 }
 
@@ -550,6 +575,12 @@ function readFlags(args: readonly string[]): Flags {
         root: { type: 'string' },
         offline: { type: 'boolean', default: false },
         'repo-dir': { type: 'string' },
+        pr: { type: 'string', multiple: true },
+        origin: { type: 'string', multiple: true },
+        'from-file': { type: 'string', multiple: true },
+        host: { type: 'string' },
+        repo: { type: 'string' },
+        id: { type: 'string' },
       },
     });
     return {
@@ -557,6 +588,12 @@ function readFlags(args: readonly string[]): Flags {
       root: values.root,
       offline: values.offline,
       repoDir: values['repo-dir'],
+      prs: values.pr ?? [],
+      origins: values.origin ?? [],
+      files: values['from-file'] ?? [],
+      host: values.host,
+      repo: values.repo,
+      id: values.id,
       positionals,
     };
   } catch (error) {
@@ -589,6 +626,38 @@ async function dispatch(args: readonly string[]): Promise<number> {
   }
   const root = resolveRoot(flags.root);
   const lookup = { offline: flags.offline, repoDir: flags.repoDir };
+  const importFlags = flags.prs.length + flags.origins.length + flags.files.length
+    + (flags.host ? 1 : 0) + (flags.repo ? 1 : 0) + (flags.id ? 1 : 0);
+  if (sub !== 'import' && importFlags > 0) throw new TaskCliError(`task ${sub ?? 'task'}: import flags are only valid for task import`);
+  if (sub === 'import') {
+    if (rest.length > 0) throw new TaskCliError('usage: pnpm eval task import --pr <owner/repo#N>');
+    const io = new LineReader();
+    try {
+      return runImport({
+        root,
+        prs: flags.prs,
+        origins: flags.origins,
+        files: flags.files,
+        host: flags.host,
+        repo: flags.repo,
+        id: flags.id,
+        offline: flags.offline,
+        env: process.env,
+        io: {
+          ask(prompt) {
+            writeErr(prompt);
+            return io.raw().trim();
+          },
+          log(text) {
+            writeErr(text.endsWith('\n') ? text : `${text}\n`);
+          },
+        },
+      });
+    } catch (error) {
+      if (error instanceof ImportError) throw new TaskCliError(error.message, error.exitCode);
+      throw error;
+    }
+  }
   if (sub === 'add') {
     if (rest.length > 0) throw new TaskCliError('task add: no arguments');
     return runAdd(root);
@@ -612,7 +681,7 @@ async function dispatch(args: readonly string[]): Promise<number> {
 
 export const taskCommand: Command = {
   name: 'task',
-  summary: 'Add, list, show, and validate task cards.',
+  summary: 'Add, list, show, validate, and import task cards.',
   run(args) {
     return runTask(args);
   },
