@@ -62,10 +62,10 @@ runs/<run-id>/
     workspace/
 ```
 
-`--repeat N` 大于 1 时，每一遍在 `variants/<name>/attempts/<n>/`，目录下的 `result.json` 是汇总。`result.json` 里的 `score` 固定是 `unavailable`。卡上没有 verify 时 `verify` 是 `omitted`。即使写了 verify 路径，这一票也不执行它。
+`--repeat N` 大于 1 时，每一遍在 `variants/<name>/attempts/<n>/`，目录下的 `result.json` 是汇总。`result.json` 里的 `score` 固定是 `unavailable`。卡上没有 verify 时 `verify` 是 `omitted`。即使写了 verify 路径，replay 也不执行它。判分是之后的 `pnpm eval verify`，见 [verify.md](verify.md)。
 
 Ctrl-C 或 SIGTERM 会停掉 agent 进程组，已经写下的文件留着，`result.status` 是 `interrupted`。`--resume <run-id>` 接着同一个 run：完成了的 variant 跳过，中断的那次挪到 `partials/` 再重跑。`--failed-from <run-id>` 另开一个 run，只重跑没完成的 variant，原来的证据不动。`--case without` 或 `--case with-skill` 只跑一个 variant。
 
 ## 不做
 
-不算分，不出对比。不自动回答 agent 的提问。不多模型，也不再接第二个 adapter。
+replay 本身不算分，不出对比。不自动回答 agent 的提问。不多模型，也不再接第二个 adapter。有 verify 时用 [verify.md](verify.md) 的命令判分。

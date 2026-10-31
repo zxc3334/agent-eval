@@ -1,0 +1,8 @@
+#!/bin/sh
+set -u
+if [ -f "$VERIFY_WORKSPACE/.verify-sleep" ]; then
+  echo driving > "$VERIFY_EVIDENCE/driving"
+  sleep 30
+fi
+echo drive >> "$VERIFY_EVIDENCE/phases.log"
+exit 0

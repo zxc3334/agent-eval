@@ -65,7 +65,7 @@ interface AttemptResult {
   reason?: string;
 }
 
-const SCORE_REASON = 'scoring is left to a later ticket and is unavailable';
+const SCORE_REASON = 'replay does not score; pnpm eval verify records the score, or unavailable when it cannot';
 
 function git(args: string[], cwd?: string): { ok: true; stdout: string } | { ok: false; message: string } {
   let result;

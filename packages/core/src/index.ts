@@ -25,8 +25,36 @@ export type {
 } from './marks.ts';
 export { identifier, repoPaths, writeJson } from './config.ts';
 export type { RepoPaths } from './config.ts';
-export { reservedEvidenceHooks } from './evidence.ts';
-export type { EvidenceHook, RunRef } from './evidence.ts';
+export {
+  aggregateScoreExit,
+  checkSkillEvidence,
+  parseFeaturesMap,
+  parsePinFile,
+  pinnedDigest,
+  reservedEvidenceHooks,
+  SCORE_RESULTS,
+  scoreExitCode,
+  scoreFromCheckedEvidence,
+  verdictFromFeatures,
+  VERIFY_PHASES,
+  VERIFY_UNAVAILABLE_EXIT,
+} from './evidence.ts';
+export type {
+  EvidenceHook,
+  EvidenceMode,
+  EvidenceRef,
+  FeatureEvidence,
+  FeatureSpec,
+  FeaturesMap,
+  PhaseRecord,
+  PinFile,
+  RunRef,
+  ScoreResult,
+  SkillEvidence,
+  VerifyPhase,
+  VerifyPin,
+  VerifyResult,
+} from './evidence.ts';
 export { createRunDir } from './runs.ts';
 export type { RunDir } from './runs.ts';
 export { assessCommit, canonicalSha, SHA_FORMAT_MESSAGE } from './sha.ts';

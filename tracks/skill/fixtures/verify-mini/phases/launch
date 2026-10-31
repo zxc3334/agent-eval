@@ -1,0 +1,8 @@
+#!/bin/sh
+set -u
+if [ -f "$VERIFY_WORKSPACE/.verify-launch-crash" ]; then
+  echo 'launch crashed' >&2
+  exit 2
+fi
+echo launch >> "$VERIFY_EVIDENCE/phases.log"
+exit 0

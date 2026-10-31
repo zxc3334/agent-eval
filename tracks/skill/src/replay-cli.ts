@@ -37,6 +37,7 @@ const REPLAY_HELP = [
   '',
   'A card without verify still replays. Score stays unavailable; scoring is not done here.',
   'Missing verify is not a failure and does not refuse the replay.',
+  'Replay does not execute a verify path. Score it afterwards with `pnpm eval verify`.',
   '',
   '--agent-bin replaces the executable path only. It does not change the arguments',
   'or the event contract. --root and --runs-dir choose where cards and runs live.',

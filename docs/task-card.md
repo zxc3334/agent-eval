@@ -92,11 +92,11 @@ chat-only 可以没有 PR 和 merge。两项都写 `status: "N/A"`，并写原�
 | 写法 | 含义 |
 | --- | --- |
 | 省略，或 `status: none` | 没有 verify |
-| `status: path` 加 `path` | 指向一条 verify 入口，本票不执行它 |
+| `status: path` 加 `path` | 指向工作区外的 verify 入口。重放不执行它。`pnpm eval verify` 才跑钉死版本 |
 | `status: todo` 加 `reason` | 以后再补 |
 | `status: unavailable` 加 `reason` | 当时拿不到 |
 
-没有 verify 时，scoring 可以是 unavailable，这不是 fail。本票不算分，也不要求目标仓创建 verify。
+没有 verify 时，scoring 可以是 unavailable，这不是 fail。重放本身不算分，也不要求目标仓创建 verify。判分见 [verify.md](verify.md)。
 
 ## 插手
 
